@@ -51,6 +51,7 @@ TEST_DF_4 = pd.DataFrame({
 #     res_1 = ex.color
 #     assert res_1 == 'blue'
 
+
 @pytest.mark.parametrize('path, file_name, column_name, expected_result',
                          [
                              (TEST_PATH, TEST_FILE_OF_PRODUCTS, TEST_COLUMN_1, (

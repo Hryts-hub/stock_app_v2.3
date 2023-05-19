@@ -7,6 +7,8 @@ import pandas as pd
 from stock_app_v2.data_reader_class import DataReader
 
 # from stock_app_v2.stock_app import PATH_TO_FILE_STOCK, FILE_STOCK
+from stock_app_v2.dict_macker_class import DictMaker
+
 FILE_STOCK = 'Склад 14.01.16.xlsx'
 # FILE_STOCK = 'Z:/Склад/Склад 14.01.16.xlsx'
 PATH_TO_FILE_STOCK = 'D:/OEMTECH/Projects/FILE_STOCK_FOLDER/'
@@ -24,13 +26,16 @@ class ReportMaker:
 
         # sorted dict from combo box
         self.report_dict = report_dict
-        self.old_report_dict = {}
+        # self.old_report_dict = {}
 
         # modul_df = pd.read_excel('Z:/Склад/Склад 14.01.16.xlsx', sheet_name='Склад модулей(узлов)', usecols='C,F,G')
         self.df_from_file = df_from_file
-        self.bad_balance_dict = {}
+        # self.bad_balance_dict = {}
 
-    def make_report_1(self):
+    def make_report_0(self):
+        # clean df with moduls --> existing block moduls
+
+        # print('Hi from make_report_0')
         report_dict_df = pd.DataFrame(np.array(list(self.report_dict.items())),
                                       columns=['Артикул', 'q-ty'])
 
@@ -39,10 +44,24 @@ class ReportMaker:
             filtered_modul_df['moduls_in_order'] = self.report_dict.values()
         except Exception as e:
             print(f'ОШИБКА {type(e)}: {e}')
+
+        null_df = filtered_modul_df[filtered_modul_df[
+            'Узлы (электронные модули, радиаторные, трансформаторные, кабельные и др. сборки)'].isnull()]
+        # print(null_df)
         filtered_modul_df = filtered_modul_df.dropna(
             subset=['Узлы (электронные модули, радиаторные, трансформаторные, кабельные и др. сборки)'])
         # not existing moduls removed from filtered_modul_df
+
         filtered_modul_df = filtered_modul_df.fillna(0)
+        # NA values filled with 0
+
+        return filtered_modul_df, null_df
+
+    def make_report_1(self):
+
+        # bad balance and not found moduls
+
+        filtered_modul_df, null_df = self.make_report_0()
 
         filtered_modul_df['q-ty of orders from moduls'] = (
                 filtered_modul_df['Количество (в примечаниях история приходов и уходов)'] //
@@ -53,12 +72,12 @@ class ReportMaker:
                 filtered_modul_df['moduls_in_order'])
 
         bad_balance_df = filtered_modul_df[filtered_modul_df['balance'] < 0]
-        for kv in bad_balance_df[['Артикул', 'balance']].values:
-            self.bad_balance_dict.update({int(kv[0]): fabs(kv[1])})
-        self.old_report_dict = self.report_dict
+
+        bad_balance_dict = DictMaker().make_dict_from_modul_df(bad_balance_df, 'Артикул', 'balance')
 
         quantity_min = filtered_modul_df['q-ty of orders from moduls'].min()
-        return self.bad_balance_dict, bad_balance_df[['Артикул', 'balance']], quantity_min
+        not_found = list(null_df['Артикул'].values)
+        return bad_balance_dict, bad_balance_df[['Артикул', 'balance']], quantity_min, not_found
 
     def _filter_components_in_columns(self, col_names):
         # column with OR-condition for any number of columns (all elements in device)
@@ -75,6 +94,7 @@ class ReportMaker:
             print(f'ОШИБКА {type(e)}: {e}')
 
     def make_report_2(self):
+        # returns components in moduls for all given blocks. Initial dict of components not included
         col_names = self.df_from_file.columns
         self._filter_components_in_columns(col_names)
 

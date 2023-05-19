@@ -2,6 +2,7 @@ import pytest
 
 from stock_app_v2.validator_class import Validator
 
+
 @pytest.mark.parametrize('test_string, test_name, expected_result',
                          [
                              ('{}', '', (False, 'Пустой словарь', '')),

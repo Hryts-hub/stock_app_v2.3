@@ -73,7 +73,17 @@ class DataReader:
                 self.data = self.data.iloc[14:]
                 self.data.rename(columns={'Спецификация плат': 'Unnamed: 4'}, inplace=True)
                 self.color = 'blue'
-                self.msg = f'Склад {sheet_name} загружен'
+                for col in range(8, self.data.shape[1]):
+
+                    if self.data.iloc[:, col].sum() == 0:
+
+                        # print(f'{col} is all 0')
+                        # print(f'{self.data.iloc[:, [col]].columns} is all 0')
+                        # print(f'Артикул {int(self.data.iloc[:, [col]].columns[0].split(":")[-1]) - 9} -- нет состава')
+                        self.msg += f' {int(self.data.iloc[:, [col]].columns[0].split(":")[-1]) - 9} '
+                # self.msg = f'Склад {sheet_name} загружен'
+                # print(self.data.shape)
+                # print(self.data.columns)
             except Exception as e:
                 self.color = 'red'
                 self.msg = f'ОШИБКА bom {type(e)}: {e}'

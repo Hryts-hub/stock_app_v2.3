@@ -41,6 +41,16 @@ PATH_TO_FILE_STOCK = 'D:/OEMTECH/Projects/FILE_STOCK_FOLDER/'
 
 
 class MyApp(QWidget):
+    """
+    The main class.
+    Class MyApp(QWidget) generates the main window of the application
+    with input fields, buttons and result labels.
+
+    BLOCK consist of MODULES and COMPONENTS (or just MODULES, or just COMPONENTS).
+    MODUL consist of COMPONENTS.
+
+    The report could be given for modules or components in modules AND for all components in block
+    """
 
     def __init__(self,
                  path_to_file=PATH_TO_FILE_OF_PRODUCTS,
@@ -74,13 +84,13 @@ class MyApp(QWidget):
         self.label2 = QLabel(f'{COLUMN_DICT_OF_MODULS}:', self)
         self.textbox2 = QTextEdit(self)
 
-        # !!!
         self.label22 = QLabel(f'{COLUMN_DICT_OF_COMPONENTS}:', self)
         self.textbox22 = QTextEdit(self)
 
         self.label3 = QLabel('количество блоков:', self)
         self.textbox3 = QSpinBox()
         self.textbox3.setMinimum(1)
+        self.textbox3.setMaximum(1000)
 
         self.addButton = QPushButton("Добавить в список")
         self.to_file_addButton = QPushButton("Добавить в файл ")
@@ -90,7 +100,6 @@ class MyApp(QWidget):
 
         self.removeButton = QPushButton("Убрать из списка")
 
-        # Report_1 получить словарь модулей, которые надо изготовить {арт модуля:кол-во}
         self.report_1_name = 'Report_1: баланс по модулям в блоках'
         self.report_2_name = 'Report_2: баланс по компонентам модулей с отрицатльным балансом'
         self.report_3_name = 'Report_3: BOM'
@@ -128,12 +137,13 @@ class MyApp(QWidget):
         self.initUI()
 
     def initUI(self):
+
         # Set window properties
         self.setWindowTitle("Приложение СКЛАД")
-        self.setMinimumWidth(500)
+        self.setMinimumWidth(700)
         self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
 
-        self._search_by_column_product_names()  # get msg and data for comboBox (=self.data_search DF)
+        self._search_by_column_product_names()  # get msg and data for comboBox (<==self.data_search DF)
 
         self.info_label.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
         self._set_info_label()
@@ -148,18 +158,19 @@ class MyApp(QWidget):
 
         # CHOICE AND SEARCH
         self.comboBox.activated.connect(self.update_info_label)
-        # ADD BUTTON
-        self.addButton.clicked.connect(self.add_block_to_comboBox_list)  # (self.textbox1, self.textbox2, self.textbox3)
 
-        self.to_file_addButton.clicked.connect(self.add_to_file_csv)  # (self.textbox1, self.textbox2, self.textbox3)
+        # ADD BUTTONS
+        # (self.textbox1, self.textbox2, self.textbox22, self.textbox3)
+        self.addButton.clicked.connect(self.add_block_to_comboBox_list)
+
+        self.to_file_addButton.clicked.connect(self.add_to_file_csv)
 
         # combo box with selected products and quantities
         self.comboBox_list.setSizeAdjustPolicy(QComboBox.AdjustToContents)
         self.comboBox_list.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
         self.comboBox_list.setMinimumContentsLength(15)
-        #         self.comboBox_list.setEditable(True)
-        # self.comboBox_list.addItem('')  # add empty string
-        # CHOICE
+
+        # EDIT CHOICE
         self.comboBox_list.activated.connect(self.edit_block)
 
         # REMOVE BUTTON
@@ -175,12 +186,9 @@ class MyApp(QWidget):
         self.reportButton.clicked.connect(self.get_report)
 
         self.report_info_label.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
-        # self.report_info_label.setStyleSheet(f'color: green')
-        # self.report_info_label.setText('ВЫВОД: нет')
 
         # EXIT BUTTON
         self.exitButton.clicked.connect(self.exit_app)
-        #         self.exitButton.clicked.connect(QCoreApplication.instance().quit)
 
         hbox = QHBoxLayout()
         hbox.addWidget(self.combo_box_label)
@@ -240,11 +248,20 @@ class MyApp(QWidget):
     # functions for loading data
 
     def _set_info_label(self):
+        """
+        Set color (self.color) and text (self.msg) of info label
+        :return: None
+        """
         self.info_label.setStyleSheet(f'color:{self.color};')
         self.info_label.setText(self.msg)
-        # print(f'Hi from _set_info_label! msg = {self.msg}')
 
     def _refresh_comboBox(self):  # refresh loaded list of products under SEARCH
+        """
+        The data from csv-file filed to the comboBox.
+        After entering search-string or selecting string the comboBox contains search result: rows with search_string.
+        If NO results were found or just 1, the comboBox will be returned to the initial state (data from csv-file).
+        :return: None
+        """
         self.comboBox.clear()
         self.comboBox.addItem('Обновить поиск')
         if self.data_search is not None and self.data_search.shape[0] == 1:
@@ -253,21 +270,36 @@ class MyApp(QWidget):
             for row in range(len(self.data_search.index)):
                 self.comboBox.addItem(str(self.data_search.iloc[row, 0]))
 
-    def _search_by_column_product_names(self):  # DF with data for comboBox
+    def _search_by_column_product_names(self):
+        """
+        The text in input field of comboBox is search-string.
+        If block-name contains search-string, the block added to the self.data_search (DF with result of search).
+        ComboBox filed by data from small DF, and search by another search-string can be provided.
+        The message updated with count of search result.
+        If NO results were found, the None returned.
+        :return: DF with data for comboBox or None
+        """
         # self.data_search instead self.data to provide search in small DF (search by several keys)
         if self.data_search is not None:
-            # self.comboBox.currentText() is empty str (and self.data_search = self.data) after initialization -->
-            # so self.data_search = self.data_search = self.data  (empty str in every data str)
+            # after initialization self.comboBox.currentText() is empty str (and self.data_search = self.data) -->
+            # so self.data_search = self.data  (empty str in every data str)
             self.data_search = self.data_search.loc[
                 self.data_search[COLUMN_PRODUCT_NAMES].str.find(str(self.comboBox.currentText())) != -1]
             self.msg = f"Количество найденных результатов: {self.data_search.shape[0]}"
             return self.data_search.loc[self.data_search[COLUMN_PRODUCT_NAMES] == self.comboBox.currentText()]
         else:
             return None
-            # good info print
-            # print(self.data_search.shape, self.data_search.shape[0], len(self.data_search.index), self.data_search.index)
 
     def _get_value_info_label(self, combo_idx, search_result):
+        """
+        Updates message with count of founded results.
+        Files input fields with data from search:
+            empty - if NO results or several results
+            search-string - if exactly search-string was found
+        :param combo_idx: int
+        :param search_result: DF
+        :return: None
+        """
 
         if self.data_search is None:
             self.color = 'red'
@@ -303,6 +335,12 @@ class MyApp(QWidget):
             self.data_search = self.data
 
     def update_info_label(self):
+        """
+        The main function.
+        Provides search, updating info label, comboBox and input fields.
+        :return: None
+        """
+
         combo_idx = self.comboBox.currentIndex()
         search_result = self._search_by_column_product_names()  # type DataFrame
         self._get_value_info_label(combo_idx, search_result)  # + set text in input fields
@@ -329,9 +367,9 @@ class MyApp(QWidget):
     # !!!!!!!!!!!!!! FIX class Validator !!!!!!!!!!
     def _validate_data(self):
         # need to fix eval() - forbid (+ - * ** /) from str
-        # print(self.textbox2.toPlainText())
+        print(self.textbox2.toPlainText())
         # print(list(self.textbox2.toPlainText()))
-        # print(repr(self.textbox2.toPlainText()))
+        print(repr(self.textbox2.toPlainText()))
         # print(type(self.textbox2.toPlainText()))
 
         # dict_validator_flag, self.msg, block_name = Validator(
@@ -367,6 +405,13 @@ class MyApp(QWidget):
         self._set_info_label()  # self.msg from validation
 
     def add_to_file_csv(self):
+        """
+        After validation the name and dictionaries of modules and components are written to the csv file.
+        Block data appears in csv file and comboBox (can be selected from comboBox).
+        If this block already in the file, the message in info label informs about it.
+        The existing file info can not be changed, only supplemented by a new rows.
+        :return: None
+        """
         if self._validate_data():
 
             add_df = pd.DataFrame({
@@ -378,14 +423,17 @@ class MyApp(QWidget):
             if (
                     self.data_search is not None and
                     self.textbox1.displayText() not in self.data_search[COLUMN_PRODUCT_NAMES].to_list()
-            ):
+            ) or self.data_search is None:
                 self.msg, self.color = DataReader(
                     self.path_to_file,
                     self.file_name).add_to_file_csv(add_df)
                 self.data = pd.concat([self.data, add_df], ignore_index=True).sort_values(by=COLUMN_PRODUCT_NAMES,
                                                                                           ascending=False)
                 self.data_search = self.data
+
             else:
+                print(self.data_search)
+                # print(self.textbox1.displayText() not in self.data_search[COLUMN_PRODUCT_NAMES].to_list())
                 self.color = 'orange'
                 self.msg = 'Уже есть. Нужно изменить название'
         else:
@@ -394,13 +442,12 @@ class MyApp(QWidget):
         self._set_info_label()
 
     def edit_block(self):
+        """
+        To edit your choice, select block.
+        It (name, dicts of moduls and components, quantity of blocks) appears in input fields.
+        :return: None
+        """
         combo_idx = self.comboBox_list.currentIndex()
-        # self.block_list_dict structure --> {k=modul_name: v=[dict_moduls, q-ty moduls, idx]
-        # for k, v in self.block_list_dict.items():
-        #     if v[2] == combo_idx:
-        #         self.textbox1.setText(k)
-        #         self.textbox2.setText(f'{v[0]}')  # set to str-type, not dict-type
-        #         self.textbox3.setValue(v[1])
 
         # self.block_list_dict structure --> {k=modul_name: v=[dict_moduls, dict_e_components, q-ty moduls, idx]
         for k, v in self.block_list_dict.items():
@@ -411,20 +458,20 @@ class MyApp(QWidget):
                 self.textbox3.setValue(v[2])
 
     def remove_block(self):
+        """
+        To delete your choice from comboBox for report,
+        select block and push REMOVE button.
+        Selected block removed from self.block_list_dict.items() and self.comboBox_list,
+        and can't be used for report.
+        The message in info_label informs name of the removed block.
+        :return: None
+        """
         combo_idx = self.comboBox_list.currentIndex()
-        # self.block_list_dict structure --> {k=modul_name: v=[dict_moduls, q-ty moduls, idx]
-        # for k, v in self.block_list_dict.items():
-        #     if v[2] == combo_idx:
-        #         self.block_list_dict.pop(k)
-        #         self.msg = f'{k} удален из списка.'
-        #         break
 
         # self.block_list_dict structure --> {k=modul_name: v=[dict_moduls, dict_e_components, q-ty moduls, idx]
         for k, v in self.block_list_dict.items():
             if v[3] == combo_idx:
-                # print(self.block_list_dict)
                 self.block_list_dict.pop(k)
-                # print(self.block_list_dict)
                 self.msg = f'{k} удален из списка.'
                 break
         self._refresh_comboBox_list()
@@ -461,13 +508,29 @@ class MyApp(QWidget):
         :param dict_for_report:
         :return: dict and DF with bad balance moduls (art of modul -- q-ty)
         """
-        report_dict, report_df, quantity_min, not_found = ReportMaker(dict_for_report, self.modul_df).make_report_1()
+        (
+            report_dict,
+            report_df,
+            quantity_min,
+            not_found,
+            good_balance
+        ) = ReportMaker(dict_for_report, self.modul_df).make_report_1()
+        print(f'good_balance = {good_balance}')
 
         self.report_info_label.setStyleSheet(f'color:{self.color};')
         self.report_info_label_text = ''
         if not_found:
             self.report_info_label_text += f'{not_found} - этих модулей (артикулов) НЕТ на складе "СП_плат"!!! \n'
         self.report_info_label_text += f'Модулей на складе достаточно для изготовления {quantity_min} заказов. \n'
+        # if good_balance:
+        #     self.report_info_label_text += f'Артикулы модулей, которых достаточно для изготовления: '
+        #     for art_modul in good_balance:
+        #         self.report_info_label_text += f' {art_modul}'
+        if good_balance:
+            self.report_info_label_text += f'Артикулы модулей, которых достаточно для изготовления: '
+            for art_modul in good_balance:
+                self.report_info_label_text += f' {art_modul}'
+            self.report_info_label_text += '\n'
         self.report_info_label.setText(self.report_info_label_text)
 
         self.progress_bar.setValue(20)
@@ -484,12 +547,18 @@ class MyApp(QWidget):
         """
         # if dict_for_report != self.old_dict_for_report:
         bad_balance_report_dict, bad_balance_report_df = self.compose_report_1(dict_for_report)
+        # print(good_balance)
         # else:
         #     bad_balance_report_dict = self.old_dict_for_report
 
         # print(f'bad_balance_report_df.empty = {bad_balance_report_df.empty}')
         if bad_balance_report_df.empty:
             print("Hi from empty")
+            # if good_balance:
+            #     self.report_info_label_text += f'Артикулы модулей, которых достаточно для изготовления: '
+            #     for art_modul in good_balance:
+            #         self.report_info_label_text += f' {art_modul}'
+            # self.report_info_label.setText(self.report_info_label_text)
             return {}, bad_balance_report_df
         else:
             # cols, col_moduls_dict = self._get_column_list(bad_balance_report_dict)
@@ -503,7 +572,8 @@ class MyApp(QWidget):
             big_bom_df, self.msg, self.color = DataReader(
                 PATH_TO_FILE_STOCK, FILE_STOCK).read_bom_from_stock_file(sheet_name, cols)
             print(f'msg from report2 {self.msg}')
-            self.report_info_label_text += f'НЕТ СОСТАВА атикулы модулей: {self.msg}\n'
+            if self.msg:
+                self.report_info_label_text += f'НЕТ СОСТАВА (артикулы модулей): {self.msg}\n'
 
         self._set_info_label()
         self.progress_bar.setValue(80)
@@ -521,6 +591,13 @@ class MyApp(QWidget):
         self.report_info_label.setStyleSheet(f'color:{self.color};')
         # self.report_info_label_text = ''
         self.report_info_label_text += f'Компонентов на складе достаточно для изготовления {quantity_min} заказов. '
+        # self.report_info_label.setText(self.report_info_label_text)
+
+        # if good_balance:
+        #     self.report_info_label_text += f'Артикулы модулей, которых достаточно для изготовления: '
+        #     for art_modul in good_balance:
+        #         self.report_info_label_text += f' {art_modul}'
+
         self.report_info_label.setText(self.report_info_label_text)
 
         return None, dificit
@@ -564,7 +641,8 @@ class MyApp(QWidget):
             big_bom_df, self.msg, self.color = DataReader(
                 PATH_TO_FILE_STOCK, FILE_STOCK).read_bom_from_stock_file(sheet_name, cols)
             # print(self.msg)
-            self.report_info_label_text += f'НЕТ СОСТАВА атикулы модулей: {self.msg}\n'
+            if self.msg:
+                self.report_info_label_text += f'НЕТ СОСТАВА (артикулы модулей): {self.msg}\n'
 
         self._set_info_label()
         self.progress_bar.setValue(80)

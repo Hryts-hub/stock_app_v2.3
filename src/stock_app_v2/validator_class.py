@@ -90,19 +90,19 @@ class Validator:
         # self.color = 'green'
         # self.msg = f'Добавлено в список блоков для отчета: {self.textbox1.displayText()} -- {self.textbox3.value()} шт.'
 
-    def _validate_input(self):
+    def _validate_input_txt(self):
         modul_dict = {}
-        e_componennt_dict = {}
+        component_dict = {}
         error_dict = {}
 
         print(self.string_moduls)
         print(repr(self.string_moduls))
 
-        # raw_strig_from_doc = repr(self.string_moduls)
-        # print(raw_strig_from_doc)
+        # raw_string_from_doc = repr(self.string_moduls)
+        # print(raw_string_from_doc)
 
-        raw_strig_from_doc = self.string_moduls.replace(',', '.')
-        raw_list = raw_strig_from_doc.split('\n')
+        raw_string_from_doc = self.string_moduls.replace(',', '.')
+        raw_list = raw_string_from_doc.split('\n')
         print(raw_list)
 
         for modul_str in raw_list:
@@ -123,7 +123,7 @@ class Validator:
                 art = modul_str_list[0]
                 print('--', art)
                 try:
-                    e_componennt_dict[int(art)] = float(modul_str_list[1])
+                    component_dict[int(art)] = float(modul_str_list[1])
                 except Exception as e:
                     print(f'ошибка с буквой с: {e}')
                     error_dict[modul_str] = e
@@ -131,7 +131,7 @@ class Validator:
                 arts = modul_str_list[0].split('+')
                 for art in arts:
                     try:
-                        e_componennt_dict[int(art)] = float(modul_str_list[1])
+                        component_dict[int(art)] = float(modul_str_list[1])
                     except Exception as e:
                         print(f'ошибка с буквой с: {e}')
                         error_dict[modul_str] = e
@@ -139,14 +139,62 @@ class Validator:
                 print('---', modul_str)
                 error_dict[modul_str] = modul_str
 
-            self.msg = f'ОШИБКИ: {error_dict},\n'
-        return f'{modul_dict}', f'{e_componennt_dict}'
+        self.msg = f'ОШИБКИ: {error_dict},\n'
+        return f'{modul_dict}', f'{component_dict}'
+
+    def _validate_input_excel(self):
+        input_dict = {}
+        even_col_dict = {}
+        modul_dict = {}
+        component_dict = {}
+        error_dict = {}
+
+        input_str = self.string_moduls
+
+        input_str = input_str.replace(',', '.')
+        input_str = input_str.strip('\n')
+        input_str = input_str.lower()
+        input_list = input_str.split('\n')
+
+        even_col_flag = True
+
+        if len(input_list) % 2:
+            even_col_flag = False
+        else:
+            even_col_dict = dict([(input_list[i], input_list[i + 1]) for i in range(0, len(input_list), 2)])
+            for k, v in input_dict.items():
+                if not v.strip().replace('.', '').isdigit() or float(v) > 3:
+                    even_col_flag = False
+                    break
+
+        input_dict = even_col_dict if even_col_flag else dict(
+            [(input_list[i], input_list[i + 2]) if input_list[i] != ' ' else (input_list[i + 1], input_list[i + 2]) for
+             i in range(0, len(input_list), 3)]
+        )
+
+        for k, v in input_dict.items():
+            if (
+                    (k.startswith('c') or k.startswith('с'))
+                    and k[1:].strip().isdigit()
+                    and v.strip().replace('.', '').isdigit()
+            ):
+                modul_dict[int(k[1:])] = float(v)
+            elif k.strip().isdigit() and v.strip().replace('.', '').isdigit():
+                component_dict[int(k)] = float(v)
+            else:
+                error_dict[k] = v
+
+        self.msg = f'ОШИБКИ: {error_dict},\n'
+        return f'{modul_dict}', f'{component_dict}'
 
 
     def validate(self):
-        print('Hi from validate')
+        print(f'Hi from validate -- {self.string_moduls}')
+        print(self.string_moduls)
         if self.string_moduls.find('\t') != -1:
-            self.string_moduls, self.string_components = self._validate_input()
+            self.string_moduls, self.string_components = self._validate_input_txt()
+        elif self.string_moduls.find('\n') != -1:
+            self.string_moduls, self.string_components = self._validate_input_excel()
 
         moduls_dict_str, components_dict_str = self._dict_validation()
         if self.flag:

@@ -75,9 +75,20 @@ class ReportMaker:
 
         bad_balance_dict = DictMaker().make_dict_from_modul_df(bad_balance_df, 'Артикул', 'balance')
 
+        good_balance_df = filtered_modul_df[filtered_modul_df['balance'] >= 0]
+        good_balance_dict = DictMaker().make_dict_from_modul_df(good_balance_df, 'Артикул', 'balance')
+        print(good_balance_dict)
+        print(good_balance_dict.keys())
+
         quantity_min = filtered_modul_df['q-ty of orders from moduls'].min()
         not_found = list(null_df['Артикул'].values)
-        return bad_balance_dict, bad_balance_df[['Артикул', 'balance']], quantity_min, not_found
+        return (
+            bad_balance_dict,
+            bad_balance_df[['Артикул', 'balance']],
+            int(quantity_min),
+            not_found,
+            good_balance_dict.keys()
+        )
 
     def _filter_components_in_columns(self, col_names):
         # column with OR-condition for any number of columns (all elements in device)

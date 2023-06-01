@@ -2,16 +2,14 @@
 # -*- coding: utf-8 -*-
 
 import sys
+from collections import defaultdict
+
 import pandas as pd
 # to disable warnings
 # pd.options.mode.chained_assignment = None  # default='warn'
 
 from PyQt5.QtWidgets import QWidget, QLabel, QComboBox, QPushButton, QVBoxLayout, QHBoxLayout, QSizePolicy
 from PyQt5.QtWidgets import QLineEdit, QTextEdit, QSpinBox, QCheckBox, QButtonGroup, QProgressBar
-
-# import os.path
-#
-# from math import fabs
 
 from stock_app_v2.data_reader_class import DataReader
 from stock_app_v2.dict_macker_class import DictMaker
@@ -100,21 +98,33 @@ class MyApp(QWidget):
 
         self.removeButton = QPushButton("Убрать из списка")
 
-        self.report_1_name = 'Report_1: баланс по модулям в блоках'
-        self.report_2_name = 'Report_2: баланс по компонентам модулей с отрицатльным балансом'
-        self.report_3_name = 'Report_3: BOM'
-        self.report_4_name = 'Report_4: баланс по компонентам модулей'
+        self.report_0_name = 'Report_0: существующие модули'
+        self.report_1_name = 'Report_1: недостающие модули в блоках'
+        self.report_2_name = 'Report_2: недостающие компоненты недостающих модулей'
+        self.report_3_name = 'Report_3: BOM компонетов из модулей'
+        self.report_4_name = 'Report_4: отрицательный баланс по компонентам из BOM'
+        self.report_5_name = 'Report_5: BOM по всем компонентам + цены'
+        self.report_6_name = 'Report_6: отрицательный баланс по всем компонентам + цены'
+        self.report_7_name = 'Report_7: отрицательный баланс по недостающим компонентам недостающих модулей + цены'
 
+        self.checkBox_report_0 = QCheckBox(self.report_0_name)
         self.checkBox_report_1 = QCheckBox(self.report_1_name)
         self.checkBox_report_2 = QCheckBox(self.report_2_name)
         self.checkBox_report_3 = QCheckBox(self.report_3_name)
         self.checkBox_report_4 = QCheckBox(self.report_4_name)
+        self.checkBox_report_5 = QCheckBox(self.report_5_name)
+        self.checkBox_report_6 = QCheckBox(self.report_6_name)
+        self.checkBox_report_7 = QCheckBox(self.report_7_name)
 
         self.func_dict = {}  # {key=self.checkBox_report_N: val=ReportMaker(report_dict, DF).make_report_N}
-        self.report_name_dict = {self.checkBox_report_1: self.report_1_name,
+        self.report_name_dict = {self.checkBox_report_0: self.report_0_name,
+                                 self.checkBox_report_1: self.report_1_name,
                                  self.checkBox_report_2: self.report_2_name,
                                  self.checkBox_report_3: self.report_3_name,
                                  self.checkBox_report_4: self.report_4_name,
+                                 self.checkBox_report_5: self.report_5_name,
+                                 self.checkBox_report_6: self.report_6_name,
+                                 self.checkBox_report_7: self.report_7_name,
                                  }
 
         self.checkBox_group = QButtonGroup()
@@ -129,10 +139,11 @@ class MyApp(QWidget):
         self.exitButton = QPushButton("Выйти")
 
         self.block_list_dict = {}  # comboBox dict
-        self.old_dict_for_report = {}
+        self.old_dict_for_report = defaultdict(dict)
+        self.cache_reports_dict = defaultdict(dict)
 
-        self.modul_stock_isRead = False
         self.modul_df = None
+        self.stock_df = None
 
         self.initUI()
 
@@ -177,10 +188,14 @@ class MyApp(QWidget):
         self.removeButton.clicked.connect(self.remove_block)
 
         # checkBoxes to choice the report
+        self.checkBox_group.addButton(self.checkBox_report_0)
         self.checkBox_group.addButton(self.checkBox_report_1)
-        self.checkBox_group.addButton(self.checkBox_report_2)
-        self.checkBox_group.addButton(self.checkBox_report_3)
-        self.checkBox_group.addButton(self.checkBox_report_4)
+        # self.checkBox_group.addButton(self.checkBox_report_2)
+        # self.checkBox_group.addButton(self.checkBox_report_3)
+        # self.checkBox_group.addButton(self.checkBox_report_4)
+        self.checkBox_group.addButton(self.checkBox_report_5)
+        self.checkBox_group.addButton(self.checkBox_report_6)
+        self.checkBox_group.addButton(self.checkBox_report_7)
 
         # GET REPORT BUTTON
         self.reportButton.clicked.connect(self.get_report)
@@ -226,10 +241,14 @@ class MyApp(QWidget):
         vbox.addLayout(hbox_list)  # widget with list selected data_names (blocks)
         vbox.addWidget(self.removeButton)
 
+        vbox.addWidget(self.checkBox_report_0)
         vbox.addWidget(self.checkBox_report_1)
-        vbox.addWidget(self.checkBox_report_2)
-        vbox.addWidget(self.checkBox_report_3)
-        vbox.addWidget(self.checkBox_report_4)
+        # vbox.addWidget(self.checkBox_report_2)
+        # vbox.addWidget(self.checkBox_report_3)
+        # vbox.addWidget(self.checkBox_report_4)
+        vbox.addWidget(self.checkBox_report_5)
+        vbox.addWidget(self.checkBox_report_6)
+        vbox.addWidget(self.checkBox_report_7)
 
         vbox.addWidget(self.reportButton)
 
@@ -352,11 +371,6 @@ class MyApp(QWidget):
     def _refresh_comboBox_list(self):
         self.comboBox_list.clear()
         i = 0  # index is comboBox_list Index
-        # self.block_list_dict structure --> {k=modul_name: v=[dict_moduls, q-ty moduls, idx]
-        # for k, v in self.block_list_dict.items():
-        #     self.comboBox_list.addItem(f'{v[1]}  {k}')
-        #     self.block_list_dict[k] = [v[0], v[1], i]
-        #     i += 1
 
         # self.block_list_dict structure --> {k=modul_name: v=[dict_moduls, dict_e_components, q-ty moduls, idx]
         for k, v in self.block_list_dict.items():
@@ -367,20 +381,14 @@ class MyApp(QWidget):
     # !!!!!!!!!!!!!! FIX class Validator !!!!!!!!!!
     def _validate_data(self):
         # need to fix eval() - forbid (+ - * ** /) from str
-        print(self.textbox2.toPlainText())
-        # print(list(self.textbox2.toPlainText()))
-        print(repr(self.textbox2.toPlainText()))
-        # print(type(self.textbox2.toPlainText()))
+        # print(repr(self.textbox2.toPlainText()))
 
-        # dict_validator_flag, self.msg, block_name = Validator(
-        #     self.textbox2.toPlainText(), self.textbox1.displayText()).validate()
         dict_validator_flag, self.msg, block_name, moduls_dict_str, components_dict_str = Validator(
             self.textbox1.displayText(),
             self.textbox2.toPlainText(),
             self.textbox22.toPlainText()).validate()
         if dict_validator_flag:
             self.textbox1.setText(block_name)
-            # self.textbox2.setText(self.msg)
             self.textbox2.setText(moduls_dict_str)
             self.textbox22.setText(components_dict_str)
         return dict_validator_flag
@@ -388,9 +396,6 @@ class MyApp(QWidget):
     # ADD product to list of products (dict with indexes for combobox) and add to comboBox_list
     def add_block_to_comboBox_list(self):  # self.block_list_dict = {} at the start
         if self._validate_data():
-            # self.block_list_dict[self.textbox1.displayText()] = [
-            #     eval(self.textbox2.toPlainText()),
-            #     self.textbox3.value()]  # idx will be added under _refresh_comboBox_list
             self.block_list_dict[self.textbox1.displayText()] = [
                 eval(self.textbox2.toPlainText()),
                 eval(self.textbox22.toPlainText()),
@@ -432,8 +437,6 @@ class MyApp(QWidget):
                 self.data_search = self.data
 
             else:
-                print(self.data_search)
-                # print(self.textbox1.displayText() not in self.data_search[COLUMN_PRODUCT_NAMES].to_list())
                 self.color = 'orange'
                 self.msg = 'Уже есть. Нужно изменить название'
         else:
@@ -482,16 +485,15 @@ class MyApp(QWidget):
 
     def make_dict_for_report(self):
         self.progress_bar.setValue(5)
-        # print(self.block_list_dict)
         result = DictMaker(self.block_list_dict).make_report_dict() if self.block_list_dict else {}  # None
         return result
 
     def read_modul_from_stock_file(self):
-        self.modul_stock_isRead = True
         sheet_name = 'Склад модулей(узлов)'
         cols = 'C,F,G'
         self.modul_df, self.msg, self.color = DataReader(
-            PATH_TO_FILE_STOCK, FILE_STOCK).read_modul_from_stock_file(sheet_name, cols)
+            PATH_TO_FILE_STOCK, FILE_STOCK).read_data_from_stock_file(sheet_name, cols)
+        self.modul_df = self.modul_df.iloc[2:]
         self.progress_bar.setValue(10)
         self._set_info_label()
 
@@ -503,182 +505,319 @@ class MyApp(QWidget):
         list_of_columns.extend(col_moduls_dict.keys())
         return list_of_columns, col_moduls_dict
 
-    def compose_report_1(self, dict_for_report):
+    def compose_report_0(self):
         """
-        :param dict_for_report:
+
         :return: dict and DF with bad balance moduls (art of modul -- q-ty)
         """
+
+        dict_for_report = self.make_dict_for_report()
+
+        notnull_report_df, null_df = ReportMaker(self.modul_df).make_report_0(dict_for_report)
+
+        null_report_dict = DictMaker().make_dict_from_df(null_df, 'Артикул', 'q-ty')
+        not_found = list(null_report_dict.keys())
+
+        if not_found:
+            info_text = f'{not_found} - этих модулей (артикулов) НЕТ на складе "СП_плат"!!! \n'
+        else:
+            info_text = 'Все модули указаны корректно. \n'
+        self.report_info_label.setStyleSheet(f'color:{self.color};')
+        self.report_info_label_text = info_text
+        self.report_info_label.setText(info_text)
+        self.progress_bar.setValue(10)
+
+        self.cache_reports_dict[self.report_0_name] = (notnull_report_df, info_text)
+
+    def compose_report_1(self):
+        """
+
+        :return: dict and DF with bad balance moduls (art of modul -- q-ty)
+        """
+
+        if not self.cache_reports_dict[self.report_0_name]:
+            self.compose_report_0()
+
+        notnull_report_df, info_text = self.cache_reports_dict[self.report_0_name]
+
         (
             report_dict,
             report_df,
             quantity_min,
-            not_found,
-            good_balance
-        ) = ReportMaker(dict_for_report, self.modul_df).make_report_1()
-        print(f'good_balance = {good_balance}')
+            good_balance   # good_balance_dict.keys()
+        ) = ReportMaker(notnull_report_df).make_report_1()
 
-        self.report_info_label.setStyleSheet(f'color:{self.color};')
-        self.report_info_label_text = ''
-        if not_found:
-            self.report_info_label_text += f'{not_found} - этих модулей (артикулов) НЕТ на складе "СП_плат"!!! \n'
-        self.report_info_label_text += f'Модулей на складе достаточно для изготовления {quantity_min} заказов. \n'
-        # if good_balance:
-        #     self.report_info_label_text += f'Артикулы модулей, которых достаточно для изготовления: '
-        #     for art_modul in good_balance:
-        #         self.report_info_label_text += f' {art_modul}'
+        info_text += f'Модулей на складе достаточно для изготовления {quantity_min} заказов. \n'
+
         if good_balance:
-            self.report_info_label_text += f'Артикулы модулей, которых достаточно для изготовления: '
+            info_text += f'Артикулы модулей, которых достаточно для изготовления: \n'
             for art_modul in good_balance:
-                self.report_info_label_text += f' {art_modul}'
-            self.report_info_label_text += '\n'
-        self.report_info_label.setText(self.report_info_label_text)
+                info_text += f' {art_modul},'
+            info_text = info_text[:-1]
+            info_text += '\n'
+        self.report_info_label.setText(info_text)
+        self.report_info_label_text = info_text
 
         self.progress_bar.setValue(20)
+        self.cache_reports_dict[self.report_1_name] = (report_df, info_text)
+
+    def read_sp_plat(self, report_df, info_text, report_dict):
         if report_df.empty:
-            # return None, None
-            return {}, report_df
-        return report_dict, report_df
-
-    def compose_report_2(self, dict_for_report):
-        """
-
-        :param dict_for_report:
-        :return: bad balance components (not including elements from components dict)
-        """
-        # if dict_for_report != self.old_dict_for_report:
-        bad_balance_report_dict, bad_balance_report_df = self.compose_report_1(dict_for_report)
-        # print(good_balance)
-        # else:
-        #     bad_balance_report_dict = self.old_dict_for_report
-
-        # print(f'bad_balance_report_df.empty = {bad_balance_report_df.empty}')
-        if bad_balance_report_df.empty:
-            print("Hi from empty")
-            # if good_balance:
-            #     self.report_info_label_text += f'Артикулы модулей, которых достаточно для изготовления: '
-            #     for art_modul in good_balance:
-            #         self.report_info_label_text += f' {art_modul}'
-            # self.report_info_label.setText(self.report_info_label_text)
-            return {}, bad_balance_report_df
+            self.cache_reports_dict[self.report_3_name] = (report_df, info_text)
+            return None
         else:
-            # cols, col_moduls_dict = self._get_column_list(bad_balance_report_dict)
             self.msg = f'ЖДИТЕ!!! Читается БОЛЬШОЙ файл!'
             self.color = 'blue'
             self._set_info_label()
             self.progress_bar.setValue(25)
 
-            cols, col_moduls_dict = self._get_column_list(bad_balance_report_dict)
+            cols, col_moduls_dict = self._get_column_list(report_dict)
             sheet_name = 'СП_плат'
             big_bom_df, self.msg, self.color = DataReader(
-                PATH_TO_FILE_STOCK, FILE_STOCK).read_bom_from_stock_file(sheet_name, cols)
-            print(f'msg from report2 {self.msg}')
-            if self.msg:
-                self.report_info_label_text += f'НЕТ СОСТАВА (артикулы модулей): {self.msg}\n'
+                PATH_TO_FILE_STOCK, FILE_STOCK).read_data_from_stock_file(sheet_name, cols)
 
-        self._set_info_label()
-        self.progress_bar.setValue(80)
-        report_dict, report_df = ReportMaker(col_moduls_dict, big_bom_df).make_report_2()
-        dificit = report_df[['Артикул', 'Unnamed: 3', 'Unnamed: 4',
+            big_bom_df = big_bom_df.iloc[14:]
+            big_bom_df.rename(columns={'Спецификация плат': 'Unnamed: 4'}, inplace=True)
+            for col in range(8, big_bom_df.shape[1]):
+                if big_bom_df.iloc[:, col].sum() == 0:
+                    self.msg += f' {int(big_bom_df.iloc[:, [col]].columns[0].split(":")[-1]) - 9} '
+
+            if self.color == 'red':
+                self._set_info_label()
+                self.report_info_label_text = info_text
+                self.cache_reports_dict[self.report_3_name] = (None, info_text)
+                return None
+            else:
+                if self.msg:
+                    info_text += f'НЕТ СОСТАВА (артикулы модулей): {self.msg}\n'
+                self.report_info_label.setStyleSheet(f'color:{self.color};')
+                self.report_info_label_text = info_text
+                self.report_info_label.setText(info_text)
+
+                self.progress_bar.setValue(70)
+
+                report_df = ReportMaker(big_bom_df).make_report_2(col_moduls_dict)
+                return report_df
+
+    def compose_report_2(self):
+        """
+
+        :return: bad balance components (not including elements from components dict)
+        """
+
+        if not self.cache_reports_dict[self.report_1_name]:
+            self.compose_report_1()
+
+        bad_balance_report_df, info_text = self.cache_reports_dict[self.report_1_name]
+        bad_balance_report_dict = DictMaker().make_dict_from_df(bad_balance_report_df, 'Артикул', 'balance')
+
+        report_df = self.read_sp_plat(bad_balance_report_df, info_text, bad_balance_report_dict)
+
+        deficit_df = report_df[['Артикул', 'Unnamed: 3', 'Unnamed: 4',
                              'Склад основной', 'sum_components',
-                             'quantity', 'balance']][report_df['balance'] < 0]
+                             'Штук можно изготовить', 'balance']][report_df['balance'] < 0]
 
-        # proficit = report_df[['Артикул', 'Unnamed: 3', 'Unnamed: 4',
-        #                       'Склад основной', 'sum_components',
-        #                       'quantity', 'balance']][report_df['balance'] >= 0]
-        #
-        quantity_min = report_df['quantity'].min()
+        proficit = report_df[['Артикул', 'balance']][report_df['balance'] >= 0]
+        proficit_dict = DictMaker().make_dict_from_df(proficit, 'Артикул', 'balance')
+        proficit_list = list(proficit_dict.keys())
+        if proficit_list:
+            info_text += f'Артикулы компонентов, которых достаточно для изготовления: \n'
+            for art_modul in proficit_list:
+                info_text += f' {art_modul},'
+            info_text = info_text[:-1]
+            info_text += '\n'
+
+        quantity_min = report_df['Штук можно изготовить'].min()
 
         self.report_info_label.setStyleSheet(f'color:{self.color};')
-        # self.report_info_label_text = ''
-        self.report_info_label_text += f'Компонентов на складе достаточно для изготовления {quantity_min} заказов. '
-        # self.report_info_label.setText(self.report_info_label_text)
+        info_text += f'Компонентов на складе достаточно для изготовления {quantity_min} заказов. \n'
+        self.report_info_label.setText(info_text)
+        self.report_info_label_text = info_text
 
-        # if good_balance:
-        #     self.report_info_label_text += f'Артикулы модулей, которых достаточно для изготовления: '
-        #     for art_modul in good_balance:
-        #         self.report_info_label_text += f' {art_modul}'
+        self.progress_bar.setValue(80)
 
-        self.report_info_label.setText(self.report_info_label_text)
+        self.cache_reports_dict[self.report_2_name] = (deficit_df, info_text)
 
-        return None, dificit
-
-    # def inner_func_for_label(self):
-    #     self.msg = f'ЖДИТЕ!!! Читается БОЛЬШОЙ файл - страница СП_плат!'
-    #     self.color = 'blue'
-    #     self._set_info_label()
-    #     self.progress_bar.setValue(20)
-
-    def compose_report_3(self, dict_for_report):
+    def compose_report_3(self):
         """
         BOM without elements from components dict
-        :param dict_for_report:
         :return:
         """
-        self.report_info_label_text = ''
-        notnull_report_df, null_report_df = ReportMaker(dict_for_report, self.modul_df).make_report_0()
-        # print(f'notnull_report_df: {notnull_report_df}')
-        notnull_report_dict = DictMaker().make_dict_from_modul_df(notnull_report_df, 'Артикул', 'moduls_in_order')
-        null_report_dict = DictMaker().make_dict_from_modul_df(null_report_df, 'Артикул', 'moduls_in_order')
-        not_found = list(null_report_dict.keys())
 
-        if not_found:
-            self.report_info_label_text += f'{not_found} - этих модулей (артикулов) НЕТ на складе "СП_плат"!!! \n'
+        if not self.cache_reports_dict[self.report_0_name]:
+            self.compose_report_0()
 
-        if notnull_report_df.empty:
-            print("Hi from empty input dict")
-            # ??? None?
-            return {}, notnull_report_df
-        else:
+        notnull_report_df, info_text = self.cache_reports_dict[self.report_0_name]
 
-            self.msg = f'ЖДИТЕ!!! Читается БОЛЬШОЙ файл - страница СП_плат!'
-            self.color = 'blue'
-            self._set_info_label()
-            self.progress_bar.setValue(20)
-            cols, col_moduls_dict = self._get_column_list(notnull_report_dict)
-            # print(cols)
-            # print(col_moduls_dict)
-            sheet_name = 'СП_плат'
-            big_bom_df, self.msg, self.color = DataReader(
-                PATH_TO_FILE_STOCK, FILE_STOCK).read_bom_from_stock_file(sheet_name, cols)
-            # print(self.msg)
-            if self.msg:
-                self.report_info_label_text += f'НЕТ СОСТАВА (артикулы модулей): {self.msg}\n'
+        notnull_report_dict = DictMaker().make_dict_from_df(notnull_report_df, 'Артикул', 'q-ty')
 
-        self._set_info_label()
-        self.progress_bar.setValue(80)
-        report_dict, report_df = ReportMaker(col_moduls_dict, big_bom_df).make_report_2()
+        report_df = self.read_sp_plat(notnull_report_df, info_text, notnull_report_dict)
 
-        self.report_info_label.setStyleSheet(f'color:{self.color};')
-        self.report_info_label.setText(self.report_info_label_text)
+        info_text = self.report_info_label_text
 
-        return None, report_df[['Артикул', 'Unnamed: 3', 'Unnamed: 4',
+        report_df = report_df[['Артикул', 'Unnamed: 3', 'Unnamed: 4',
                                  'Склад основной', 'sum_components',
-                                 'quantity', 'balance']]
+                                 'Штук можно изготовить', 'balance']]
 
-    def compose_report_4(self, dict_for_report):
+        self.cache_reports_dict[self.report_3_name] = (report_df, info_text)
+
+    def compose_report_4(self):
         """
         bad balance for components in moduls
-        :param dict_for_report:
+
         :return:
         """
-        # self.report_info_label.setText('')
-        a, report_df = self.compose_report_3(dict_for_report)
-        if report_df.empty:
-            self.report_info_label.setStyleSheet(f'color:{self.color};')
-            self.report_info_label.setText(self.report_info_label_text)
-            return None, None
+
+        if not self.cache_reports_dict[self.report_3_name]:
+            self.compose_report_3()
+
+        report_df, info_text = self.cache_reports_dict[self.report_3_name]
+
+        if report_df is None or report_df.empty:
+            self.cache_reports_dict[self.report_4_name] = (report_df, info_text)
+            return None
         else:
-            deficit = report_df[['Артикул', 'Unnamed: 3', 'Unnamed: 4',
+            report_df = report_df[['Артикул', 'Unnamed: 3', 'Unnamed: 4',
                                  'Склад основной', 'sum_components',
-                                 'quantity', 'balance']][report_df['balance'] < 0]
+                                 'Штук можно изготовить', 'balance']][(report_df['balance'] < 0)]
 
-            quantity_min = report_df['quantity'].min()
+            quantity_min = report_df['Штук можно изготовить'].min()
 
             self.report_info_label.setStyleSheet(f'color:{self.color};')
-            self.report_info_label_text += f'Компонентов на складе достаточно для изготовления {quantity_min} заказов. '
-            self.report_info_label.setText(self.report_info_label_text)
+            info_text += f'Компонентов на складе достаточно для изготовления {quantity_min} заказов.\n'
+            self.report_info_label.setText(info_text)
+            self.report_info_label_text = info_text
+            self.progress_bar.setValue(90)
 
-            return None, deficit
+            self.cache_reports_dict[self.report_4_name] = (report_df, info_text)
+
+    def prepare_stock_df(self):
+        cols = 'C, D, G, I, K'
+        sheet_name = 'Склад'
+        self.stock_df, self.msg, self.color = DataReader(
+            PATH_TO_FILE_STOCK, FILE_STOCK).read_data_from_stock_file(sheet_name, cols)
+
+        self.stock_df = self.stock_df.iloc[12:]
+
+        self.stock_df = self.stock_df.dropna(subset=['Артикул'])
+
+        self.stock_df = self.stock_df.astype({'Артикул': int})
+
+        self.stock_df[['Склад основной', 'Цена, $']] = self.stock_df[['Склад основной', 'Цена, $']].fillna(0)
+
+        for val in self.stock_df['Склад основной'].values:
+            self.stock_df.loc[self.stock_df['Склад основной'] == val, 'Склад основной'] = 0 if (
+                not str(val).replace(',', '').isdigit()) else val
+
+        for val in self.stock_df['Цена, $'].values:
+            self.stock_df.loc[self.stock_df['Цена, $'] == val, 'Цена, $'] = 0 if (
+                    str(val).isspace() or str(val) == '') else val
+
+        self.stock_df['Цена, EURO'] = 0  # None
+
+        for val in self.stock_df['Цена, $'].values:
+            if str(val).lower().find('e') != -1 or str(val).lower().find('е') != -1:
+                self.stock_df.loc[self.stock_df['Цена, $'] == val, 'Цена, $'] = 0
+                self.stock_df.loc[self.stock_df['Цена, $'] == val, 'Цена, EURO'] = str(val).replace(',', '.').strip()[:-1]
+
+        self.stock_df[['Склад основной', 'Цена, $', 'Цена, EURO']] = self.stock_df[[
+            'Склад основной', 'Цена, $', 'Цена, EURO']].astype(float)
+
+    def calculate_price(self, components_from_modules_df, info_text):
+
+        components_from_modules_dict = DictMaker().make_dict_from_df(
+            components_from_modules_df,
+            'Артикул',
+            'sum_components'
+        )
+
+        components_from_block_dict = DictMaker(
+            self.block_list_dict).make_component_report_dict() if self.block_list_dict else {}
+
+        res_compo_dict = DictMaker(
+            self.block_list_dict).make_big_report_dict(components_from_modules_dict, components_from_block_dict)
+
+        compo_data = defaultdict(list)
+        [compo_data['Артикул'].append(k) for k in res_compo_dict.keys()]
+        [compo_data['quantity'].append(v) for v in res_compo_dict.values()]
+        res_compo_df = pd.DataFrame.from_dict(compo_data)
+
+        if self.stock_df is None:
+            self.prepare_stock_df()
+
+        report_stock_df = res_compo_df.merge(self.stock_df, how='left', on='Артикул')
+
+        not_found_df = report_stock_df[report_stock_df['Название\n(Комплектующие склада)'].isnull()]
+        not_found_dict = DictMaker().make_dict_from_df(not_found_df, 'Артикул', 'quantity')
+        not_found = list(not_found_dict.keys())
+
+        if not_found:
+            info_text += f'НЕТ ИНФОРМАЦИИ по артикулам этих компонентов: {not_found} \n'
+        else:
+            info_text += 'Все компоненты указаны корректно. \n'
+
+        report_stock_df['total $'] = report_stock_df['quantity'] * report_stock_df['Цена, $']
+        report_stock_df['total EURO'] = report_stock_df['quantity'] * report_stock_df['Цена, EURO']
+
+        dollar_price = round(report_stock_df['total $'].sum(), 2)
+        euro_price = round(report_stock_df['total EURO'].sum(), 2)
+
+        info_text += f'Цена = {dollar_price} $ + {euro_price} euro \n'
+
+        null_df = report_stock_df[(report_stock_df['Цена, $'] == 0) & (report_stock_df['Цена, EURO'] == 0)]
+        null_price_list = list(null_df['Артикул'])
+        if null_price_list:
+            info_text += f'НЕТ ЦЕНЫ для этих компонентов (артикулы): {null_price_list} \n'
+
+        self.report_info_label_text = info_text
+
+        self.report_info_label.setText(self.report_info_label_text)
+
+        self.progress_bar.setValue(95)
+        return report_stock_df
+
+    def compose_report_5(self):
+
+        if not self.cache_reports_dict[self.report_3_name]:
+            self.compose_report_3()
+
+        components_from_modules_df, info_text = self.cache_reports_dict[self.report_3_name]
+
+        if components_from_modules_df is None or components_from_modules_df.empty:
+            self.cache_reports_dict[self.report_5_name] = (components_from_modules_df, info_text)
+            return None
+
+        report_stock_df = self.calculate_price(components_from_modules_df, info_text)
+
+        info_text = self.report_info_label_text
+
+        self.cache_reports_dict[self.report_5_name] = (report_stock_df, info_text)
+
+    def compose_report_6(self):
+
+        if not self.cache_reports_dict[self.report_4_name]:
+            self.compose_report_4()
+
+        components_from_modules_df, info_text = self.cache_reports_dict[self.report_4_name]
+
+        report_stock_df = self.calculate_price(components_from_modules_df, info_text)
+
+        info_text = self.report_info_label_text
+
+        self.cache_reports_dict[self.report_6_name] = (report_stock_df, info_text)
+
+    def compose_report_7(self):
+
+        if not self.cache_reports_dict[self.report_2_name]:
+            self.compose_report_2()
+
+        components_from_modules_df, info_text = self.cache_reports_dict[self.report_2_name]
+
+        report_stock_df = self.calculate_price(components_from_modules_df, info_text)
+
+        info_text = self.report_info_label_text
+
+        self.cache_reports_dict[self.report_7_name] = (report_stock_df, info_text)
 
     def get_report(self):
 
@@ -687,46 +826,73 @@ class MyApp(QWidget):
             self.w = None  # Discard reference to ReportWindow
 
         self.progress_bar.reset()
+        self.color = 'blue'
+        self.report_info_label.setStyleSheet(f'color:{self.color};')
         self.report_info_label.setText('.....')
 
-        if not self.modul_stock_isRead:
+        if self.modul_df is None:
             self.read_modul_from_stock_file()
 
-        dict_for_report = self.make_dict_for_report()
-        if dict_for_report == self.old_dict_for_report:
-            print('old_dict_for_report = dict_for_report')
-            pass
+        input_str = str(self.block_list_dict)
+
+        if input_str not in str(self.old_dict_for_report.keys()):
+            self.report_info_label_text = f'{list(self.block_list_dict.keys())}'
+            self.color = 'blue'
+            self.report_info_label.setStyleSheet(f'color:{self.color};')
+            self.old_dict_for_report.clear()
+            self.cache_reports_dict.clear()
 
         self.func_dict = {
-            # self.checkBox_report_1: ReportMaker(dict_for_report, self.modul_df).make_report_1,
+            self.checkBox_report_0: self.compose_report_0,
             self.checkBox_report_1: self.compose_report_1,
             self.checkBox_report_2: self.compose_report_2,
             self.checkBox_report_3: self.compose_report_3,
             self.checkBox_report_4: self.compose_report_4,
-            # self.checkBox_report_2: ReportMaker(dict_for_report, self.modul_df).make_report_2
+            self.checkBox_report_5: self.compose_report_5,
+            self.checkBox_report_6: self.compose_report_6,
+            self.checkBox_report_7: self.compose_report_7,
                           }
+
         report_name = self.report_name_dict.get(self.checkBox_group.checkedButton())
-        if self.checkBox_group.checkedButton() and dict_for_report and self.modul_df is not None:
-            report_dict, report_df = self.func_dict[self.checkBox_group.checkedButton()](dict_for_report)
 
-            print(f'report_dict = {report_dict}')
-            print(f'report_df = {report_df}')
+        if self.checkBox_group.checkedButton() and self.block_list_dict and self.modul_df is not None:
 
-            self.msg = f'Обработан отчёт: {report_name}.'
-            self.color = 'green'
+            if not (self.old_dict_for_report.keys() and self.old_dict_for_report[input_str][report_name]):
+                self.color = 'blue'
+                self.report_info_label.setStyleSheet(f'color:{self.color};')
+                self.report_info_label.setText('..........')
+
+                self.func_dict[self.checkBox_group.checkedButton()]()
+
+                try:
+                    self.old_dict_for_report[input_str] = self.cache_reports_dict
+                except Exception as e:
+                    print(e)
+
+            if self.color == 'red':
+                self.msg += f'\nОбработан отчёт: {report_name}.'
+            else:
+
+                self.msg = f'Обработан отчёт: {report_name}.'
+                self.color = 'green'
+            res_df, info_text = self.old_dict_for_report[input_str][report_name]
+
         else:
             self.msg = 'Блоки не заданы' if report_name else 'Отчет не выбран'
             self.color = 'red'
-            report_dict, report_df = None, None
+            info_text = self.msg
+            res_df = None
 
         self.progress_bar.setValue(100)
         self._set_info_label()
 
-        self.old_dict_for_report = dict_for_report
+        self.color = 'blue'
+        self.report_info_label.setStyleSheet(f'color:{self.color};')
+        self.report_info_label.setText(info_text)
 
         # REPORT WINDOW
-        if report_df is not None and not report_df.empty and report_name:
-            self.w = ReportWindow(report_name, report_df)
+        if res_df is not None and not res_df.empty and report_name:
+            self.w = ReportWindow(report_name, res_df)
             self.w.show()
 
     def exit_app(self):

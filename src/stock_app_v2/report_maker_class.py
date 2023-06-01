@@ -6,87 +6,67 @@ import pandas as pd
 # to disable warnings
 from stock_app_v2.data_reader_class import DataReader
 
-# from stock_app_v2.stock_app import PATH_TO_FILE_STOCK, FILE_STOCK
 from stock_app_v2.dict_macker_class import DictMaker
-
-FILE_STOCK = 'Склад 14.01.16.xlsx'
-# FILE_STOCK = 'Z:/Склад/Склад 14.01.16.xlsx'
-PATH_TO_FILE_STOCK = 'D:/OEMTECH/Projects/FILE_STOCK_FOLDER/'
 
 pd.options.mode.chained_assignment = None  # default='warn'
 
 
 class ReportMaker:
-    def __init__(self,
-                 # report_name,
-                 # report_option,
-                 report_dict, df_from_file):
-        # self.report_name = report_name  # self.checkBox_report_1 (names written near ceck boxes)
-        # self.report_option = report_option  # self.checkBox_group.checkedButton() (selected option)
+    def __init__(self, df_from_file):
 
-        # sorted dict from combo box
-        self.report_dict = report_dict
-        # self.old_report_dict = {}
-
-        # modul_df = pd.read_excel('Z:/Склад/Склад 14.01.16.xlsx', sheet_name='Склад модулей(узлов)', usecols='C,F,G')
         self.df_from_file = df_from_file
-        # self.bad_balance_dict = {}
 
-    def make_report_0(self):
-        # clean df with moduls --> existing block moduls
+    def make_report_0(self, report_dict):
+        # clean df with modules --> existing block modules DF + not existing (null_df)
 
-        # print('Hi from make_report_0')
-        report_dict_df = pd.DataFrame(np.array(list(self.report_dict.items())),
+        report_dict_df = pd.DataFrame(np.array(list(report_dict.items())),
                                       columns=['Артикул', 'q-ty'])
 
         filtered_modul_df = report_dict_df.merge(self.df_from_file, on='Артикул', how='left')
-        try:
-            filtered_modul_df['moduls_in_order'] = self.report_dict.values()
-        except Exception as e:
-            print(f'ОШИБКА {type(e)}: {e}')
+
+        filtered_modul_df = filtered_modul_df.astype({'Артикул': int})
 
         null_df = filtered_modul_df[filtered_modul_df[
             'Узлы (электронные модули, радиаторные, трансформаторные, кабельные и др. сборки)'].isnull()]
-        # print(null_df)
+
         filtered_modul_df = filtered_modul_df.dropna(
             subset=['Узлы (электронные модули, радиаторные, трансформаторные, кабельные и др. сборки)'])
         # not existing moduls removed from filtered_modul_df
 
         filtered_modul_df = filtered_modul_df.fillna(0)
         # NA values filled with 0
-
-        return filtered_modul_df, null_df
-
-    def make_report_1(self):
-
-        # bad balance and not found moduls
-
-        filtered_modul_df, null_df = self.make_report_0()
-
-        filtered_modul_df['q-ty of orders from moduls'] = (
+        filtered_modul_df['possible q-ty of orders'] = (
                 filtered_modul_df['Количество (в примечаниях история приходов и уходов)'] //
-                filtered_modul_df['moduls_in_order'])
+                filtered_modul_df['q-ty'])
+
+        filtered_modul_df = filtered_modul_df.astype({'possible q-ty of orders': int})
 
         filtered_modul_df['balance'] = (
                 filtered_modul_df['Количество (в примечаниях история приходов и уходов)'] -
-                filtered_modul_df['moduls_in_order'])
+                filtered_modul_df['q-ty'])
+
+        return (
+            filtered_modul_df,
+            null_df,
+            )
+
+    def make_report_1(self):
+
+        # bad balance for existing moduls, and not found moduls
+        filtered_modul_df = self.df_from_file
 
         bad_balance_df = filtered_modul_df[filtered_modul_df['balance'] < 0]
 
-        bad_balance_dict = DictMaker().make_dict_from_modul_df(bad_balance_df, 'Артикул', 'balance')
+        bad_balance_dict = DictMaker().make_dict_from_df(bad_balance_df, 'Артикул', 'balance')
 
         good_balance_df = filtered_modul_df[filtered_modul_df['balance'] >= 0]
-        good_balance_dict = DictMaker().make_dict_from_modul_df(good_balance_df, 'Артикул', 'balance')
-        print(good_balance_dict)
-        print(good_balance_dict.keys())
+        good_balance_dict = DictMaker().make_dict_from_df(good_balance_df, 'Артикул', 'balance')
 
-        quantity_min = filtered_modul_df['q-ty of orders from moduls'].min()
-        not_found = list(null_df['Артикул'].values)
+        quantity_min = filtered_modul_df['possible q-ty of orders'].min()
         return (
             bad_balance_dict,
             bad_balance_df[['Артикул', 'balance']],
             int(quantity_min),
-            not_found,
             good_balance_dict.keys()
         )
 
@@ -104,14 +84,16 @@ class ReportMaker:
         except Exception as e:
             print(f'ОШИБКА {type(e)}: {e}')
 
-    def make_report_2(self):
+    def make_report_2(self, col_moduls_dict):
         # returns components in moduls for all given blocks. Initial dict of components not included
+        # moduls is existing moduls
+
         col_names = self.df_from_file.columns
         self._filter_components_in_columns(col_names)
 
         self.df_from_file = self.df_from_file.fillna(0)
 
-        for k, v in self.report_dict.items():
+        for k, v in col_moduls_dict.items():
 
             self.df_from_file[f'Unnamed: {k}'] = self.df_from_file[f'Unnamed: {k}'] * v
 
@@ -133,11 +115,11 @@ class ReportMaker:
 
         quantity = filtered_df['Склад основной'].astype(float) // filtered_df['sum_components']
 
-        df_quantity = pd.DataFrame({'quantity': quantity})
-        filtered_df['quantity'] = df_quantity['quantity'].astype(int)
+        df_quantity = pd.DataFrame({'Штук можно изготовить': quantity})
+        filtered_df['Штук можно изготовить'] = df_quantity['Штук можно изготовить'].astype(int)
 
         filtered_df.loc[:, 'balance'] = filtered_df['Склад основной'] - filtered_df['sum_components']
 
-        return None, filtered_df
+        return filtered_df
 
 

@@ -10,29 +10,21 @@ class Validator:
 
     @staticmethod
     def _check_curly_brackets(string):
-        print('Hi from _check_curly_brackets')
         if not string.startswith('{'):
             string = '{' + string
         if not string.endswith('}'):
             string = string + '}'
-        print(string)
         return string
 
     @staticmethod
     def _try_dict(dict_string):
-        print(f'Hi from _try_dict: {dict_string}')
         result_string = dict_string
-        # msg = ''
         flag = False
         try:
             try_dict = eval(dict_string)
             if (isinstance(try_dict, dict)
                     and all(isinstance(k, int)
                             and (isinstance(v, int) or isinstance(v, float)) for k, v in try_dict.items())):
-                # if try_dict != {}:
-                #     flag = True
-                # else:
-                #     msg = 'Пустой словарь'
                 flag = True
                 result_string = f'{try_dict}'
                 msg = result_string
@@ -44,11 +36,6 @@ class Validator:
         return result_string, msg, flag
 
     def _dict_validation(self):
-        print('Hi from _dict_validation')
-        # if not self.string_moduls_dict.startswith('{'):
-        #     self.string_moduls_dict = '{' + self.string_moduls_dict
-        # if not self.string_moduls_dict.endswith('}'):
-        #     self.string_moduls_dict = self.string_moduls_dict + '}'
         self.string_moduls = self._check_curly_brackets(self.string_moduls)
         self.string_components = self._check_curly_brackets(self.string_components)
 
@@ -58,92 +45,56 @@ class Validator:
         self.flag = False if moduls_dict_str == components_dict_str == '{}' else (flag_moduls and flag_components)
         self.msg += f'модули: {msg_moduls},\nкомпоненты: {msg_components}'
 
-        # try:
-        #     moduls_dict = eval(self.string_moduls_dict)
-        #     if (isinstance(moduls_dict, dict)
-        #             and all(isinstance(k, int)
-        #                     and (isinstance(v, int) or isinstance(v, float)) for k, v in moduls_dict.items())):
-        #         if moduls_dict != {}:
-        #             self.msg = f'{moduls_dict}'
-        #             self.flag = True
-        #             # return moduls_dict  # True,
-        #         else:
-        #             self.msg = 'Пустой словарь'
-        #     else:
-        #         self.msg = 'Неправильный словарь'
-        # except:
-        #     self.msg = 'Приведите словарь к виду: {1: 1.5, 2: 6} или 1:1.5,2:6'
         return moduls_dict_str, components_dict_str
 
     def _block_name_validation(self):
-        print('Hi from _block_name_validation')
         if self.block_name is None \
                 or self.block_name == ''\
                 or self.block_name.isspace():
-            #             moduls_dict = eval(self.textbox2.displayText())
             moduls_dict = eval(self.string_moduls)
             self.block_name = [str(k) for k, v in moduls_dict.items()]
             self.block_name = '_'.join(self.block_name)
-        #     self.textbox1.setText(name_str)
-        # else:
-        #     self.textbox1.setText(self.msg)
-        # self.color = 'green'
-        # self.msg = f'Добавлено в список блоков для отчета: {self.textbox1.displayText()} -- {self.textbox3.value()} шт.'
 
     def _validate_input_txt(self):
         modul_dict = {}
         component_dict = {}
-        error_dict = {}
-
-        print(self.string_moduls)
-        print(repr(self.string_moduls))
-
-        # raw_string_from_doc = repr(self.string_moduls)
-        # print(raw_string_from_doc)
+        error_list = []
 
         raw_string_from_doc = self.string_moduls.replace(',', '.')
         raw_list = raw_string_from_doc.split('\n')
-        print(raw_list)
 
         for modul_str in raw_list:
 
             modul_str_list = modul_str.split('\t')
             modul_str_list = [s.strip() for s in modul_str_list if s != '']
 
-            print(modul_str_list)
             if modul_str_list[0].lower().startswith('c') or modul_str_list[0].lower().startswith('с'):
                 art = modul_str_list[0][1:].strip()
-                print(art)
                 try:
                     modul_dict[int(art)] = float(modul_str_list[1])
                 except Exception as e:
-                    print(f'ошибка с буквой с: {e}')
-                    error_dict[modul_str] = e
+                    error_list.append((modul_str, e))
             elif modul_str_list[0].isdigit():
                 art = modul_str_list[0]
-                print('--', art)
                 try:
                     component_dict[int(art)] = float(modul_str_list[1])
                 except Exception as e:
-                    print(f'ошибка с буквой с: {e}')
-                    error_dict[modul_str] = e
+                    error_list.append((modul_str, e))
             elif modul_str_list[0].find('+') != -1:
                 arts = modul_str_list[0].split('+')
                 for art in arts:
                     try:
                         component_dict[int(art)] = float(modul_str_list[1])
                     except Exception as e:
-                        print(f'ошибка с буквой с: {e}')
-                        error_dict[modul_str] = e
+                        error_list.append((modul_str, e))
             else:
-                print('---', modul_str)
-                error_dict[modul_str] = modul_str
+                error_list.append(modul_str)
 
-        self.msg = f'ОШИБКИ: {error_dict},\n'
+
+        self.msg = f'ОШИБКИ: {error_list},\n'
         return f'{modul_dict}', f'{component_dict}'
 
     def _validate_input_excel(self):
-        input_dict = {}
         even_col_dict = {}
         modul_dict = {}
         component_dict = {}
@@ -156,14 +107,26 @@ class Validator:
         input_str = input_str.lower()
         input_list = input_str.split('\n')
 
+        for i in range(0, len(input_list) - 1):
+            if ((input_list[i].startswith('c') or input_list[i].startswith('с'))
+                    and (input_list[i + 1].startswith('c') or input_list[i + 1].startswith('с'))):
+                error_dict[input_list[i + 1]] = ''
+
+        for i in range(0, len(input_list) - 1):
+            if ((input_list[i].endswith('c') or input_list[i].endswith('с'))
+                    and (input_list[i + 1].endswith('c') or input_list[i + 1].endswith('с'))):
+                error_dict[input_list[i + 1]] = ''
+
+        input_list = [i for i in input_list if i not in error_dict.keys()]
+
         even_col_flag = True
 
         if len(input_list) % 2:
             even_col_flag = False
         else:
             even_col_dict = dict([(input_list[i], input_list[i + 1]) for i in range(0, len(input_list), 2)])
-            for k, v in input_dict.items():
-                if not v.strip().replace('.', '').isdigit() or float(v) > 3:
+            for k, v in even_col_dict.items():
+                if not v.strip().replace('.', '').isdigit() or float(v) > 10:
                     even_col_flag = False
                     break
 
@@ -174,6 +137,12 @@ class Validator:
 
         for k, v in input_dict.items():
             if (
+                    (k.endswith('c') or k.endswith('с'))
+                    and k[:-1].strip().isdigit()
+                    and v.strip().replace('.', '').isdigit()
+            ):
+                modul_dict[int(k[:-1])] = float(v)
+            elif (
                     (k.startswith('c') or k.startswith('с'))
                     and k[1:].strip().isdigit()
                     and v.strip().replace('.', '').isdigit()
@@ -187,10 +156,7 @@ class Validator:
         self.msg = f'ОШИБКИ: {error_dict},\n'
         return f'{modul_dict}', f'{component_dict}'
 
-
     def validate(self):
-        print(f'Hi from validate -- {self.string_moduls}')
-        print(self.string_moduls)
         if self.string_moduls.find('\t') != -1:
             self.string_moduls, self.string_components = self._validate_input_txt()
         elif self.string_moduls.find('\n') != -1:
@@ -199,13 +165,4 @@ class Validator:
         moduls_dict_str, components_dict_str = self._dict_validation()
         if self.flag:
             self._block_name_validation()  # creates name, if name is None or ''
-            # self.block_list_dict[self.textbox1.displayText()] = [
-            #     eval(self.textbox2.toPlainText()),
-            #     self.textbox3.value()]
-            # self._refresh_comboBox_list()
-        #     self.color = 'green'
-        # else:
-        #     self.color = 'red'
-        print(f'validated {self.msg}')
-        print(self.block_name, moduls_dict_str, components_dict_str)
         return self.flag, self.msg, self.block_name, moduls_dict_str, components_dict_str

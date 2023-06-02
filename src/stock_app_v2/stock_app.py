@@ -104,8 +104,8 @@ class MyApp(QWidget):
         self.report_3_name = 'Report_3: BOM компонетов из модулей'
         self.report_4_name = 'Report_4: отрицательный баланс по компонентам из BOM'
         self.report_5_name = 'Report_5: BOM по всем компонентам + цены'
-        self.report_6_name = 'Report_6: отрицательный баланс по всем компонентам + цены'
-        self.report_7_name = 'Report_7: отрицательный баланс по недостающим компонентам недостающих модулей + цены'
+        self.report_6_name = 'Report_6: недостающие компоненты из BOM + цены'
+        self.report_7_name = 'Report_7: недостающие компоненты недостающих модулей + цены'
 
         self.checkBox_report_0 = QCheckBox(self.report_0_name)
         self.checkBox_report_1 = QCheckBox(self.report_1_name)
@@ -190,9 +190,9 @@ class MyApp(QWidget):
         # checkBoxes to choice the report
         self.checkBox_group.addButton(self.checkBox_report_0)
         self.checkBox_group.addButton(self.checkBox_report_1)
-        # self.checkBox_group.addButton(self.checkBox_report_2)
-        # self.checkBox_group.addButton(self.checkBox_report_3)
-        # self.checkBox_group.addButton(self.checkBox_report_4)
+        self.checkBox_group.addButton(self.checkBox_report_2)
+        self.checkBox_group.addButton(self.checkBox_report_3)
+        self.checkBox_group.addButton(self.checkBox_report_4)
         self.checkBox_group.addButton(self.checkBox_report_5)
         self.checkBox_group.addButton(self.checkBox_report_6)
         self.checkBox_group.addButton(self.checkBox_report_7)
@@ -243,9 +243,9 @@ class MyApp(QWidget):
 
         vbox.addWidget(self.checkBox_report_0)
         vbox.addWidget(self.checkBox_report_1)
-        # vbox.addWidget(self.checkBox_report_2)
-        # vbox.addWidget(self.checkBox_report_3)
-        # vbox.addWidget(self.checkBox_report_4)
+        vbox.addWidget(self.checkBox_report_2)
+        vbox.addWidget(self.checkBox_report_3)
+        vbox.addWidget(self.checkBox_report_4)
         vbox.addWidget(self.checkBox_report_5)
         vbox.addWidget(self.checkBox_report_6)
         vbox.addWidget(self.checkBox_report_7)
@@ -513,7 +513,7 @@ class MyApp(QWidget):
 
         dict_for_report = self.make_dict_for_report()
 
-        notnull_report_df, null_df = ReportMaker(self.modul_df).make_report_0(dict_for_report)
+        notnull_report_df, null_df, quantity_min, = ReportMaker(self.modul_df).make_report_0(dict_for_report)
 
         null_report_dict = DictMaker().make_dict_from_df(null_df, 'Артикул', 'q-ty')
         not_found = list(null_report_dict.keys())
@@ -522,6 +522,9 @@ class MyApp(QWidget):
             info_text = f'{not_found} - этих модулей (артикулов) НЕТ на складе "СП_плат"!!! \n'
         else:
             info_text = 'Все модули указаны корректно. \n'
+
+        info_text += f'Модулей на складе достаточно для изготовления {quantity_min} заказов. \n'
+
         self.report_info_label.setStyleSheet(f'color:{self.color};')
         self.report_info_label_text = info_text
         self.report_info_label.setText(info_text)
@@ -540,14 +543,16 @@ class MyApp(QWidget):
 
         notnull_report_df, info_text = self.cache_reports_dict[self.report_0_name]
 
-        (
-            report_dict,
-            report_df,
-            quantity_min,
-            good_balance   # good_balance_dict.keys()
-        ) = ReportMaker(notnull_report_df).make_report_1()
-
-        info_text += f'Модулей на складе достаточно для изготовления {quantity_min} заказов. \n'
+        if notnull_report_df.empty:
+            report_df = notnull_report_df
+            good_balance = {}
+            report_dict = {}
+        else:
+            (
+                report_dict,
+                report_df,
+                good_balance   # good_balance_dict.keys()
+            ) = ReportMaker(notnull_report_df).make_report_1()
 
         if good_balance:
             info_text += f'Артикулы модулей, которых достаточно для изготовления: \n'
@@ -555,6 +560,7 @@ class MyApp(QWidget):
                 info_text += f' {art_modul},'
             info_text = info_text[:-1]
             info_text += '\n'
+
         self.report_info_label.setText(info_text)
         self.report_info_label_text = info_text
 
@@ -609,32 +615,37 @@ class MyApp(QWidget):
             self.compose_report_1()
 
         bad_balance_report_df, info_text = self.cache_reports_dict[self.report_1_name]
-        bad_balance_report_dict = DictMaker().make_dict_from_df(bad_balance_report_df, 'Артикул', 'balance')
 
-        report_df = self.read_sp_plat(bad_balance_report_df, info_text, bad_balance_report_dict)
+        if bad_balance_report_df is None or bad_balance_report_df.empty:
+            deficit_df = bad_balance_report_df
+        else:
 
-        deficit_df = report_df[['Артикул', 'Unnamed: 3', 'Unnamed: 4',
-                             'Склад основной', 'sum_components',
-                             'Штук можно изготовить', 'balance']][report_df['balance'] < 0]
+            bad_balance_report_dict = DictMaker().make_dict_from_df(bad_balance_report_df, 'Артикул', 'balance')
 
-        proficit = report_df[['Артикул', 'balance']][report_df['balance'] >= 0]
-        proficit_dict = DictMaker().make_dict_from_df(proficit, 'Артикул', 'balance')
-        proficit_list = list(proficit_dict.keys())
-        if proficit_list:
-            info_text += f'Артикулы компонентов, которых достаточно для изготовления: \n'
-            for art_modul in proficit_list:
-                info_text += f' {art_modul},'
-            info_text = info_text[:-1]
-            info_text += '\n'
+            report_df = self.read_sp_plat(bad_balance_report_df, info_text, bad_balance_report_dict)
 
-        quantity_min = report_df['Штук можно изготовить'].min()
+            deficit_df = report_df[['Артикул', 'Unnamed: 3', 'Unnamed: 4',
+                                 'Склад основной', 'sum_components',
+                                 'Штук можно изготовить', 'balance']][report_df['balance'] < 0]
 
-        self.report_info_label.setStyleSheet(f'color:{self.color};')
-        info_text += f'Компонентов на складе достаточно для изготовления {quantity_min} заказов. \n'
-        self.report_info_label.setText(info_text)
-        self.report_info_label_text = info_text
+            proficit = report_df[['Артикул', 'balance']][report_df['balance'] >= 0]
+            proficit_dict = DictMaker().make_dict_from_df(proficit, 'Артикул', 'balance')
+            proficit_list = list(proficit_dict.keys())
+            if proficit_list:
+                info_text += f'Артикулы компонентов, которых достаточно для изготовления: \n'
+                for art_modul in proficit_list:
+                    info_text += f' {art_modul},'
+                info_text = info_text[:-1]
+                info_text += '\n'
 
-        self.progress_bar.setValue(80)
+            quantity_min = report_df['Штук можно изготовить'].min()
+
+            self.report_info_label.setStyleSheet(f'color:{self.color};')
+            info_text += f'Компонентов на складе достаточно для изготовления {quantity_min} заказов. \n'
+            self.report_info_label.setText(info_text)
+            self.report_info_label_text = info_text
+
+            self.progress_bar.setValue(80)
 
         self.cache_reports_dict[self.report_2_name] = (deficit_df, info_text)
 
@@ -649,15 +660,26 @@ class MyApp(QWidget):
 
         notnull_report_df, info_text = self.cache_reports_dict[self.report_0_name]
 
-        notnull_report_dict = DictMaker().make_dict_from_df(notnull_report_df, 'Артикул', 'q-ty')
+        if notnull_report_df.empty:
+            report_df = notnull_report_df
+        else:
 
-        report_df = self.read_sp_plat(notnull_report_df, info_text, notnull_report_dict)
+            notnull_report_dict = DictMaker().make_dict_from_df(notnull_report_df, 'Артикул', 'q-ty')
 
-        info_text = self.report_info_label_text
+            report_df = self.read_sp_plat(notnull_report_df, info_text, notnull_report_dict)
 
-        report_df = report_df[['Артикул', 'Unnamed: 3', 'Unnamed: 4',
-                                 'Склад основной', 'sum_components',
-                                 'Штук можно изготовить', 'balance']]
+            info_text = self.report_info_label_text
+
+            report_df = report_df[['Артикул', 'Unnamed: 3', 'Unnamed: 4',
+                                     'Склад основной', 'sum_components',
+                                     'Штук можно изготовить', 'balance']]
+
+            quantity_min = report_df['Штук можно изготовить'].min()
+            self.report_info_label.setStyleSheet(f'color:{self.color};')
+            info_text += f'Компонентов на складе достаточно для изготовления {quantity_min} заказов.\n'
+            self.report_info_label.setText(info_text)
+            self.report_info_label_text = info_text
+            self.progress_bar.setValue(90)
 
         self.cache_reports_dict[self.report_3_name] = (report_df, info_text)
 
@@ -674,20 +696,14 @@ class MyApp(QWidget):
         report_df, info_text = self.cache_reports_dict[self.report_3_name]
 
         if report_df is None or report_df.empty:
+            # quantity_min = report_df['Штук можно изготовить'].min()
+            # info_text += f'Компонентов на складе достаточно для изготовления {quantity_min} заказов.\n'
             self.cache_reports_dict[self.report_4_name] = (report_df, info_text)
             return None
         else:
             report_df = report_df[['Артикул', 'Unnamed: 3', 'Unnamed: 4',
                                  'Склад основной', 'sum_components',
                                  'Штук можно изготовить', 'balance']][(report_df['balance'] < 0)]
-
-            quantity_min = report_df['Штук можно изготовить'].min()
-
-            self.report_info_label.setStyleSheet(f'color:{self.color};')
-            info_text += f'Компонентов на складе достаточно для изготовления {quantity_min} заказов.\n'
-            self.report_info_label.setText(info_text)
-            self.report_info_label_text = info_text
-            self.progress_bar.setValue(90)
 
             self.cache_reports_dict[self.report_4_name] = (report_df, info_text)
 
@@ -784,6 +800,7 @@ class MyApp(QWidget):
         components_from_modules_df, info_text = self.cache_reports_dict[self.report_3_name]
 
         if components_from_modules_df is None or components_from_modules_df.empty:
+            info_text += 'БОМ пуст'
             self.cache_reports_dict[self.report_5_name] = (components_from_modules_df, info_text)
             return None
 
@@ -800,6 +817,11 @@ class MyApp(QWidget):
 
         components_from_modules_df, info_text = self.cache_reports_dict[self.report_4_name]
 
+        if components_from_modules_df.empty:
+            info_text += 'По БОМ нет недостающих компонентов'
+            self.cache_reports_dict[self.report_6_name] = (components_from_modules_df, info_text)
+            return None
+
         report_stock_df = self.calculate_price(components_from_modules_df, info_text)
 
         info_text = self.report_info_label_text
@@ -812,6 +834,11 @@ class MyApp(QWidget):
             self.compose_report_2()
 
         components_from_modules_df, info_text = self.cache_reports_dict[self.report_2_name]
+
+        if components_from_modules_df.empty:
+            info_text += 'Нет недостающих компонентов в недостающих модулях'
+            self.cache_reports_dict[self.report_7_name] = (components_from_modules_df, info_text)
+            return None
 
         report_stock_df = self.calculate_price(components_from_modules_df, info_text)
 

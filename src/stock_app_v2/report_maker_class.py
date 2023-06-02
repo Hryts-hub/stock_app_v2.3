@@ -35,11 +35,15 @@ class ReportMaker:
 
         filtered_modul_df = filtered_modul_df.fillna(0)
         # NA values filled with 0
-        filtered_modul_df['possible q-ty of orders'] = (
+        filtered_modul_df['Штук можно изготовить'] = (
                 filtered_modul_df['Количество (в примечаниях история приходов и уходов)'] //
                 filtered_modul_df['q-ty'])
 
-        filtered_modul_df = filtered_modul_df.astype({'possible q-ty of orders': int})
+        filtered_modul_df = filtered_modul_df.astype({'Штук можно изготовить': int})
+        if filtered_modul_df.empty:
+            quantity_min = 0
+        else:
+            quantity_min = filtered_modul_df['Штук можно изготовить'].min()
 
         filtered_modul_df['balance'] = (
                 filtered_modul_df['Количество (в примечаниях история приходов и уходов)'] -
@@ -48,6 +52,7 @@ class ReportMaker:
         return (
             filtered_modul_df,
             null_df,
+            int(quantity_min),
             )
 
     def make_report_1(self):
@@ -62,11 +67,11 @@ class ReportMaker:
         good_balance_df = filtered_modul_df[filtered_modul_df['balance'] >= 0]
         good_balance_dict = DictMaker().make_dict_from_df(good_balance_df, 'Артикул', 'balance')
 
-        quantity_min = filtered_modul_df['possible q-ty of orders'].min()
+        # quantity_min = filtered_modul_df['Штук можно изготовить'].min()
         return (
             bad_balance_dict,
             bad_balance_df[['Артикул', 'balance']],
-            int(quantity_min),
+            # int(quantity_min),
             good_balance_dict.keys()
         )
 

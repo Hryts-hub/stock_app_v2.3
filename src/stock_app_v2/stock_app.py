@@ -98,14 +98,14 @@ class MyApp(QWidget):
 
         self.removeButton = QPushButton("Убрать из списка")
 
-        self.report_0_name = 'Report_0: существующие модули'
-        self.report_1_name = 'Report_1: недостающие модули в блоках'
-        self.report_2_name = 'Report_2: недостающие компоненты недостающих модулей'
-        self.report_3_name = 'Report_3: BOM компонетов из модулей'
-        self.report_4_name = 'Report_4: отрицательный баланс по компонентам из BOM'
-        self.report_5_name = 'Report_5: BOM по всем компонентам + цены'
-        self.report_6_name = 'Report_6: недостающие компоненты из BOM + цены'
-        self.report_7_name = 'Report_7: недостающие компоненты недостающих модулей + цены'
+        self.report_0_name = 'Report_0 существующие модули'
+        self.report_1_name = 'Report_1 недостающие модули в блоках'
+        self.report_2_name = 'Report_2 недостающие компоненты недостающих модулей'
+        self.report_3_name = 'Report_3 BOM (компонеты из модулей)'
+        self.report_4_name = 'Report_4 недостающие компоненты из BOM (компонеты из модулей)'
+        self.report_5_name = 'Report_5 BOM по всем компонентам + цены'
+        self.report_6_name = 'Report_6 недостающие компоненты из BOM + цены'
+        self.report_7_name = 'Report_7 недостающие компоненты недостающих модулей + цены'
 
         self.checkBox_report_0 = QCheckBox(self.report_0_name)
         self.checkBox_report_1 = QCheckBox(self.report_1_name)
@@ -750,40 +750,48 @@ class MyApp(QWidget):
         components_from_block_dict = DictMaker(
             self.block_list_dict).make_component_report_dict() if self.block_list_dict else {}
 
-        res_compo_dict = DictMaker(
-            self.block_list_dict).make_big_report_dict(components_from_modules_dict, components_from_block_dict)
+        if components_from_modules_df is None or components_from_modules_df.empty:
+            res_compo_dict = components_from_block_dict
+        else:
+            res_compo_dict = DictMaker(
+                self.block_list_dict).make_big_report_dict(components_from_modules_dict, components_from_block_dict)
 
         compo_data = defaultdict(list)
         [compo_data['Артикул'].append(k) for k in res_compo_dict.keys()]
         [compo_data['quantity'].append(v) for v in res_compo_dict.values()]
         res_compo_df = pd.DataFrame.from_dict(compo_data)
 
-        if self.stock_df is None:
-            self.prepare_stock_df()
-
-        report_stock_df = res_compo_df.merge(self.stock_df, how='left', on='Артикул')
-
-        not_found_df = report_stock_df[report_stock_df['Название\n(Комплектующие склада)'].isnull()]
-        not_found_dict = DictMaker().make_dict_from_df(not_found_df, 'Артикул', 'quantity')
-        not_found = list(not_found_dict.keys())
-
-        if not_found:
-            info_text += f'НЕТ ИНФОРМАЦИИ по артикулам этих компонентов: {not_found} \n'
+        if res_compo_df.empty:
+            report_stock_df = pd.DataFrame()
         else:
-            info_text += 'Все компоненты указаны корректно. \n'
 
-        report_stock_df['total $'] = report_stock_df['quantity'] * report_stock_df['Цена, $']
-        report_stock_df['total EURO'] = report_stock_df['quantity'] * report_stock_df['Цена, EURO']
+            if self.stock_df is None:
+                self.prepare_stock_df()
 
-        dollar_price = round(report_stock_df['total $'].sum(), 2)
-        euro_price = round(report_stock_df['total EURO'].sum(), 2)
+            report_stock_df = res_compo_df.merge(self.stock_df, how='left', on='Артикул')
 
-        info_text += f'Цена = {dollar_price} $ + {euro_price} euro \n'
+            not_found_df = report_stock_df[report_stock_df['Название\n(Комплектующие склада)'].isnull()]
+            not_found_dict = DictMaker().make_dict_from_df(not_found_df, 'Артикул', 'quantity')
 
-        null_df = report_stock_df[(report_stock_df['Цена, $'] == 0) & (report_stock_df['Цена, EURO'] == 0)]
-        null_price_list = list(null_df['Артикул'])
-        if null_price_list:
-            info_text += f'НЕТ ЦЕНЫ для этих компонентов (артикулы): {null_price_list} \n'
+            not_found = list(not_found_dict.keys())
+
+            if not_found:
+                info_text += f'НЕТ ИНФОРМАЦИИ по артикулам этих компонентов: {not_found} \n'
+            else:
+                info_text += 'Все компоненты указаны корректно. \n'
+
+            report_stock_df['total $'] = report_stock_df['quantity'] * report_stock_df['Цена, $']
+            report_stock_df['total EURO'] = report_stock_df['quantity'] * report_stock_df['Цена, EURO']
+
+            dollar_price = round(report_stock_df['total $'].sum(), 2)
+            euro_price = round(report_stock_df['total EURO'].sum(), 2)
+
+            info_text += f'Цена = {dollar_price} $ + {euro_price} euro \n'
+
+            null_df = report_stock_df[(report_stock_df['Цена, $'] == 0) & (report_stock_df['Цена, EURO'] == 0)]
+            null_price_list = list(null_df['Артикул'])
+            if null_price_list:
+                info_text += f'НЕТ ЦЕНЫ для этих компонентов (артикулы): {null_price_list} \n'
 
         self.report_info_label_text = info_text
 
@@ -799,12 +807,12 @@ class MyApp(QWidget):
 
         components_from_modules_df, info_text = self.cache_reports_dict[self.report_3_name]
 
-        if components_from_modules_df is None or components_from_modules_df.empty:
-            info_text += 'БОМ пуст'
+        report_stock_df = self.calculate_price(components_from_modules_df, info_text)
+
+        if report_stock_df is None or report_stock_df.empty:
+            info_text += 'БОМ пуст!'
             self.cache_reports_dict[self.report_5_name] = (components_from_modules_df, info_text)
             return None
-
-        report_stock_df = self.calculate_price(components_from_modules_df, info_text)
 
         info_text = self.report_info_label_text
 
@@ -817,12 +825,12 @@ class MyApp(QWidget):
 
         components_from_modules_df, info_text = self.cache_reports_dict[self.report_4_name]
 
-        if components_from_modules_df.empty:
+        report_stock_df = self.calculate_price(components_from_modules_df, info_text)
+
+        if report_stock_df is None or report_stock_df.empty:
             info_text += 'По БОМ нет недостающих компонентов'
             self.cache_reports_dict[self.report_6_name] = (components_from_modules_df, info_text)
             return None
-
-        report_stock_df = self.calculate_price(components_from_modules_df, info_text)
 
         info_text = self.report_info_label_text
 
@@ -835,12 +843,12 @@ class MyApp(QWidget):
 
         components_from_modules_df, info_text = self.cache_reports_dict[self.report_2_name]
 
-        if components_from_modules_df.empty:
+        report_stock_df = self.calculate_price(components_from_modules_df, info_text)
+
+        if report_stock_df is None or report_stock_df.empty:
             info_text += 'Нет недостающих компонентов в недостающих модулях'
             self.cache_reports_dict[self.report_7_name] = (components_from_modules_df, info_text)
             return None
-
-        report_stock_df = self.calculate_price(components_from_modules_df, info_text)
 
         info_text = self.report_info_label_text
 

@@ -41,6 +41,7 @@ class DictMaker:
     @staticmethod
     def make_dict_from_df(modul_df, col_name1, col_name2):
         modul_dict = {}
-        for kv in modul_df[[col_name1, col_name2]].values:
-            modul_dict.update({int(kv[0]): fabs(kv[1])})
+        if not modul_df.empty:
+            for kv in modul_df[[col_name1, col_name2]].values:
+                modul_dict.update({int(kv[0]): fabs(kv[1])})
         return modul_dict

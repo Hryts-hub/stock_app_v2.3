@@ -18,37 +18,43 @@ class ReportMaker:
 
     def make_report_0(self, report_dict):
         # clean df with modules --> existing block modules DF + not existing (null_df)
+        if report_dict.items():
+            report_dict_df = pd.DataFrame(np.array(list(report_dict.items())),
+                                          columns=['Артикул', 'q-ty'])
 
-        report_dict_df = pd.DataFrame(np.array(list(report_dict.items())),
-                                      columns=['Артикул', 'q-ty'])
+            filtered_modul_df = report_dict_df.merge(self.df_from_file, on='Артикул', how='left')
 
-        filtered_modul_df = report_dict_df.merge(self.df_from_file, on='Артикул', how='left')
+            filtered_modul_df = filtered_modul_df.astype({'Артикул': int})
 
-        filtered_modul_df = filtered_modul_df.astype({'Артикул': int})
+            null_df = filtered_modul_df[filtered_modul_df[
+                'Узлы (электронные модули, радиаторные, трансформаторные, кабельные и др. сборки)'].isnull()]
 
-        null_df = filtered_modul_df[filtered_modul_df[
-            'Узлы (электронные модули, радиаторные, трансформаторные, кабельные и др. сборки)'].isnull()]
+            filtered_modul_df = filtered_modul_df.dropna(
+                subset=['Узлы (электронные модули, радиаторные, трансформаторные, кабельные и др. сборки)'])
+            # not existing moduls removed from filtered_modul_df
 
-        filtered_modul_df = filtered_modul_df.dropna(
-            subset=['Узлы (электронные модули, радиаторные, трансформаторные, кабельные и др. сборки)'])
-        # not existing moduls removed from filtered_modul_df
+            filtered_modul_df = filtered_modul_df.fillna(0)
+            # NA values filled with 0
+            filtered_modul_df['Штук можно изготовить'] = (
+                    filtered_modul_df['Количество (в примечаниях история приходов и уходов)'] //
+                    filtered_modul_df['q-ty'])
 
-        filtered_modul_df = filtered_modul_df.fillna(0)
-        # NA values filled with 0
-        filtered_modul_df['Штук можно изготовить'] = (
-                filtered_modul_df['Количество (в примечаниях история приходов и уходов)'] //
-                filtered_modul_df['q-ty'])
+            filtered_modul_df = filtered_modul_df.astype({'Штук можно изготовить': int})
+            if filtered_modul_df.empty:
+                quantity_min = 0
+            else:
+                quantity_min = filtered_modul_df['Штук можно изготовить'].min()
 
-        filtered_modul_df = filtered_modul_df.astype({'Штук можно изготовить': int})
-        if filtered_modul_df.empty:
-            quantity_min = 0
+            filtered_modul_df['balance'] = (
+                    filtered_modul_df['Количество (в примечаниях история приходов и уходов)'] -
+                    filtered_modul_df['q-ty'])
         else:
-            quantity_min = filtered_modul_df['Штук можно изготовить'].min()
-
-        filtered_modul_df['balance'] = (
-                filtered_modul_df['Количество (в примечаниях история приходов и уходов)'] -
-                filtered_modul_df['q-ty'])
-
+            filtered_modul_df = pd.DataFrame(columns=['Артикул', 'q-ty',
+       'Узлы (электронные модули, радиаторные, трансформаторные, кабельные и др. сборки)',
+       'Количество (в примечаниях история приходов и уходов)',
+       'Штук можно изготовить', 'balance'])
+            null_df = filtered_modul_df
+            quantity_min = 0
         return (
             filtered_modul_df,
             null_df,

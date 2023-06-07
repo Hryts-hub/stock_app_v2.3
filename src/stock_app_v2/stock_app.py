@@ -44,10 +44,11 @@ class MyApp(QWidget):
     Class MyApp(QWidget) generates the main window of the application
     with input fields, buttons and result labels.
 
-    BLOCK consist of MODULES and COMPONENTS (or just MODULES, or just COMPONENTS).
-    MODUL consist of COMPONENTS.
+    BLOCK consists of MODULES and COMPONENTS (or just MODULES, or just COMPONENTS).
+    MODUL consists of COMPONENTS.
 
-    The report could be given for modules or components in modules AND for all components in block
+    The report could be given for modules OR components in modules AND for all components in block
+    (order of blocks)
     """
 
     def __init__(self,
@@ -91,12 +92,21 @@ class MyApp(QWidget):
         self.textbox3.setMaximum(1000)
 
         self.addButton = QPushButton("Добавить в список")
-        self.to_file_addButton = QPushButton("Добавить в файл ")
+        self.to_file_addButton = QPushButton("Добавить в файл (не добавляйте мусорные, непроверенные данные!!!)")
 
         self.label_list = QLabel("Выбранные блоки:")
         self.comboBox_list = QComboBox()
 
         self.removeButton = QPushButton("Убрать из списка")
+
+        # BOM - Bill Of Materials
+
+        # Check               BOM                 Price
+        # modules
+        # existence
+        # rep_0 --> rep_1 --> rep_2 -->           rep_7
+        # rep_0 -->           rep_3 -->           rep_5
+        # rep_0 -->           rep_3 --> rep_4 --> rep_6
 
         self.report_0_name = 'Report_0 существующие модули'
         self.report_1_name = 'Report_1 недостающие модули в блоках'
@@ -116,7 +126,8 @@ class MyApp(QWidget):
         self.checkBox_report_6 = QCheckBox(self.report_6_name)
         self.checkBox_report_7 = QCheckBox(self.report_7_name)
 
-        self.func_dict = {}  # {key=self.checkBox_report_N: val=ReportMaker(report_dict, DF).make_report_N}
+        self.func_dict = {}  # {key=self.checkBox_report_N: val=ReportMaker(DF).make_report_N}
+
         self.report_name_dict = {self.checkBox_report_0: self.report_0_name,
                                  self.checkBox_report_1: self.report_1_name,
                                  self.checkBox_report_2: self.report_2_name,
@@ -133,17 +144,29 @@ class MyApp(QWidget):
 
         self.progress_bar = QProgressBar(self)
 
+        # the label with report info - output results and calculations
         self.report_info_label = QLabel()
         self.report_info_label_text = ''
 
         self.exitButton = QPushButton("Выйти")
 
+        # self.block_list_dict structure --> {k=modul_name: v=[dict_of_moduls, dict_of_components, q-ty of moduls, idx]
+        # dict were key is a module name, and value is a list of input data
         self.block_list_dict = {}  # comboBox dict
+
+        # Reports are cached on creation, and you can quickly retrieve an already calculated report.
+        # If input data changed, the self.old_dict_for_report and self.cache_reports_dict are cleared.
+        # This behavior easily can be changed to caching different input data but no need.
+
+        # STRUCTURE -- {self.block_list_dict : [self.cache_reports_dict]}
+        #               self.old_dict_for_report[input_str] = self.cache_reports_dict
+        #               res_df, info_text = self.old_dict_for_report[input_str][report_name]
+        #               res_df, info_text = self.cache_reports_dict[report_name]
         self.old_dict_for_report = defaultdict(dict)
         self.cache_reports_dict = defaultdict(dict)
 
-        self.modul_df = None
-        self.stock_df = None
+        self.modul_df = None  # from stock file -- sheet_name = 'Склад модулей(узлов)'  -- cols = 'C,F,G'
+        self.stock_df = None  # from stock file -- sheet_name = 'СП_плат'               -- cols calculated
 
         self.initUI()
 
@@ -151,7 +174,7 @@ class MyApp(QWidget):
 
         # Set window properties
         self.setWindowTitle("Приложение СКЛАД")
-        self.setMinimumWidth(700)
+        self.setMinimumWidth(800)
         self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
 
         self._search_by_column_product_names()  # get msg and data for comboBox (<==self.data_search DF)
@@ -197,7 +220,8 @@ class MyApp(QWidget):
         self.checkBox_group.addButton(self.checkBox_report_6)
         self.checkBox_group.addButton(self.checkBox_report_7)
 
-        # GET REPORT BUTTON
+        # GET_REPORT BUTTON --> opens ReportWindow with report table (can be saved in excel file)
+        # and shows report text in self.report_info_label
         self.reportButton.clicked.connect(self.get_report)
 
         self.report_info_label.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
@@ -264,11 +288,11 @@ class MyApp(QWidget):
         self.show()
 
     # ----------------------------------------------------------------
-    # functions for loading data
+    # functions for loading data (filling input fields and combo boxes)
 
     def _set_info_label(self):
         """
-        Set color (self.color) and text (self.msg) of info label
+        Set color (self.color) and text (self.msg) of the main info label --- self.info_label
         :return: None
         """
         self.info_label.setStyleSheet(f'color:{self.color};')
@@ -293,9 +317,9 @@ class MyApp(QWidget):
         """
         The text in input field of comboBox is search-string.
         If block-name contains search-string, the block added to the self.data_search (DF with result of search).
-        ComboBox filed by data from small DF, and search by another search-string can be provided.
-        The message updated with count of search result.
-        If NO results were found, the None returned.
+        ComboBox filed by data from small DF (self.data_search), and search by another search-string can be provided.
+        The message updated with count of search results.
+        If NO results were found, None returned.
         :return: DF with data for comboBox or None
         """
         # self.data_search instead self.data to provide search in small DF (search by several keys)
@@ -312,7 +336,7 @@ class MyApp(QWidget):
     def _get_value_info_label(self, combo_idx, search_result):
         """
         Updates message with count of founded results.
-        Files input fields with data from search:
+        Fills input fields with data from search:
             empty - if NO results or several results
             search-string - if exactly search-string was found
         :param combo_idx: int
@@ -344,7 +368,10 @@ class MyApp(QWidget):
 
         # 0 results were found
         else:
-            # if new string, it automatically adds to the comboBox with text and index, and combo_idx = last idx
+            # to search enter search_str into combo_idx input field --> self.data_search
+            # this str automatically added to the comboBox with text and index, and combo_idx = last idx
+            # if string has idx=0 (text = 'Обновить поиск' ) --> refresh search
+            # if self.data_search.shape[0] == 0 and combo_idx != 0 --> NO results --> refresh search
             self.msg, self.color = (
                 'Поиск обновлен', 'blue') if combo_idx == 0 else (
                 "Выбранная строка не найдена", 'red')
@@ -361,7 +388,7 @@ class MyApp(QWidget):
         """
 
         combo_idx = self.comboBox.currentIndex()
-        search_result = self._search_by_column_product_names()  # type DataFrame
+        search_result = self._search_by_column_product_names()  # type is DataFrame or None
         self._get_value_info_label(combo_idx, search_result)  # + set text in input fields
         self._refresh_comboBox()
         self._set_info_label()
@@ -369,10 +396,14 @@ class MyApp(QWidget):
     # --------------------- LIST for report and ADD to file
 
     def _refresh_comboBox_list(self):
+        """
+        Fills self.comboBox_list with refreshed data from self.block_list_dict
+        :return: None
+        """
         self.comboBox_list.clear()
-        i = 0  # index is comboBox_list Index
+        i = 0  # comboBox_list Index
 
-        # self.block_list_dict structure --> {k=modul_name: v=[dict_moduls, dict_e_components, q-ty moduls, idx]
+        # self.block_list_dict structure --> {k=modul_name: v=[dict_moduls, dict_components, q-ty moduls, idx]
         for k, v in self.block_list_dict.items():
             self.comboBox_list.addItem(f'{v[2]}  {k}')
             self.block_list_dict[k] = [v[0], v[1], v[2], i]
@@ -380,6 +411,12 @@ class MyApp(QWidget):
 
     # !!!!!!!!!!!!!! FIX class Validator !!!!!!!!!!
     def _validate_data(self):
+        """
+        Sends input data to the class Validator where function validate() cleans and transform input to correct usage.
+        After validation, you need to check dicts for report!!!
+        Some forms of input can't be accepted, and func returns False and recommendations in info label.
+        :return: dict_validator_flag: Bool
+        """
         # need to fix eval() - forbid (+ - * ** /) from str
         # print(repr(self.textbox2.toPlainText()))
 
@@ -387,21 +424,29 @@ class MyApp(QWidget):
             self.textbox1.displayText(),
             self.textbox2.toPlainText(),
             self.textbox22.toPlainText()).validate()
+
         if dict_validator_flag:
             self.textbox1.setText(block_name)
             self.textbox2.setText(moduls_dict_str)
             self.textbox22.setText(components_dict_str)
+
         return dict_validator_flag
 
     # ADD product to list of products (dict with indexes for combobox) and add to comboBox_list
     def add_block_to_comboBox_list(self):  # self.block_list_dict = {} at the start
+        """
+        After validation correct data replace text in input fields.
+        Combo box with blocks for report contains refreshed data.
+        And info label informs about last actions.
+        :return: None
+        """
         if self._validate_data():
             self.block_list_dict[self.textbox1.displayText()] = [
                 eval(self.textbox2.toPlainText()),
                 eval(self.textbox22.toPlainText()),
                 self.textbox3.value()]  # idx will be added under _refresh_comboBox_list
             self._refresh_comboBox_list()
-            self.msg += f'\n\nДобавлено в список блоков для отчета: ' \
+            self.msg += f'\nДобавлено в список блоков для отчета: ' \
                         f'{self.textbox1.displayText()}\n{self.textbox3.value()} шт.'
             self.color = 'green'
         else:
@@ -462,7 +507,7 @@ class MyApp(QWidget):
 
     def remove_block(self):
         """
-        To delete your choice from comboBox for report,
+        To delete your choice from comboBox for report
         select block and push REMOVE button.
         Selected block removed from self.block_list_dict.items() and self.comboBox_list,
         and can't be used for report.
@@ -484,11 +529,24 @@ class MyApp(QWidget):
     # ----------------------------------------------
 
     def make_dict_for_report(self):
+        """
+        Set value of progress_bar and gets dict using class DictMaker and func make_report_dict().
+        This step in independent func because of progress_bar can be changed once in func,
+        and control progress is the desired result.
+        :return: dict
+        """
         self.progress_bar.setValue(5)
         result = DictMaker(self.block_list_dict).make_report_dict() if self.block_list_dict else {}  # None
         return result
 
     def read_modul_from_stock_file(self):
+        """
+        Gets DF from excel file using class DataReader.
+        In fanc sheet_name and cols are stated.
+        Top rows from DF removed.
+        Progress bar and message in info label are updated.
+        :return: None
+        """
         sheet_name = 'Склад модулей(узлов)'
         cols = 'C,F,G'
         self.modul_df, self.msg, self.color = DataReader(
@@ -499,7 +557,13 @@ class MyApp(QWidget):
 
     @staticmethod
     def _get_column_list(moduls_dict):
-        # Works with sheet_name = 'СП_плат'
+        """
+        Works with sheet_name = 'СП_плат'.
+        Forms columns for file reading for func read_sp_plat that used in rep_2 and rep_3.
+        :param moduls_dict: dict
+        :return: list_of_columns -> list, col_moduls_dict -> dict
+        """
+
         col_moduls_dict = dict([((k + 9), v) for k, v in moduls_dict.items()])
         list_of_columns = [1, 2, 3, 4, 5, 6, 7, 8]
         list_of_columns.extend(col_moduls_dict.keys())
@@ -507,8 +571,10 @@ class MyApp(QWidget):
 
     def compose_report_0(self):
         """
-
-        :return: dict and DF with bad balance moduls (art of modul -- q-ty)
+        The base report.
+        It checks modules existence.
+        Result: DF with balance existing moduls (art of modul -- q-ty) and text with info messages
+        :return: None
         """
 
         dict_for_report = self.make_dict_for_report()
@@ -534,8 +600,8 @@ class MyApp(QWidget):
 
     def compose_report_1(self):
         """
-
-        :return: dict and DF with bad balance moduls (art of modul -- q-ty)
+        Result: DF with bad balance moduls (art of modul -- q-ty) and text with info messages
+        :return: None
         """
 
         if not self.cache_reports_dict[self.report_0_name]:
@@ -546,7 +612,6 @@ class MyApp(QWidget):
         if notnull_report_df.empty:
             report_df = notnull_report_df
             good_balance = {}
-            report_dict = {}
         else:
             (
                 report_dict,
@@ -567,15 +632,27 @@ class MyApp(QWidget):
         self.progress_bar.setValue(20)
         self.cache_reports_dict[self.report_1_name] = (report_df, info_text)
 
-    def read_sp_plat(self, report_df, info_text, report_dict):
+    def read_sp_plat(self, report_df,
+                     info_text,
+                     ):
+        """
+        Reads sheet_name = 'СП_плат' using dict based on DF from sheet_name = 'Склад модулей(узлов)'
+        (dict from self.modul_df).
+        :param report_df:
+        :param info_text:
+        :param report_dict:
+        :return: report_df -> DF
+        """
+
         if report_df.empty:
-            self.cache_reports_dict[self.report_3_name] = (report_df, info_text)
-            return None
+            return report_df
         else:
             self.msg = f'ЖДИТЕ!!! Читается БОЛЬШОЙ файл!'
             self.color = 'blue'
             self._set_info_label()
             self.progress_bar.setValue(25)
+
+            report_dict = DictMaker().make_dict_from_df(report_df, 'Артикул', 'q-ty')
 
             cols, col_moduls_dict = self._get_column_list(report_dict)
             sheet_name = 'СП_плат'
@@ -591,11 +668,11 @@ class MyApp(QWidget):
             if self.color == 'red':
                 self._set_info_label()
                 self.report_info_label_text = info_text
-                self.cache_reports_dict[self.report_3_name] = (None, info_text)
                 return None
             else:
                 if self.msg:
                     info_text += f'НЕТ СОСТАВА (артикулы модулей): {self.msg}\n'
+
                 self.report_info_label.setStyleSheet(f'color:{self.color};')
                 self.report_info_label_text = info_text
                 self.report_info_label.setText(info_text)
@@ -607,8 +684,8 @@ class MyApp(QWidget):
 
     def compose_report_2(self):
         """
-
-        :return: bad balance components (not including elements from components dict)
+        bad balance components (not including elements from components dict)
+        :return: None
         """
 
         if not self.cache_reports_dict[self.report_1_name]:
@@ -620,10 +697,11 @@ class MyApp(QWidget):
             deficit_df = bad_balance_report_df
         else:
 
-            bad_balance_report_dict = DictMaker().make_dict_from_df(bad_balance_report_df, 'Артикул', 'balance')
-
-            report_df = self.read_sp_plat(bad_balance_report_df, info_text, bad_balance_report_dict)
-
+            report_df = self.read_sp_plat(bad_balance_report_df,
+                                          info_text,
+                                          # bad_balance_report_dict
+                                          )
+            info_text = self.report_info_label_text
             deficit_df = report_df[['Артикул', 'Unnamed: 3', 'Unnamed: 4',
                                  'Склад основной', 'sum_components',
                                  'Штук можно изготовить', 'balance']][report_df['balance'] < 0]
@@ -652,7 +730,7 @@ class MyApp(QWidget):
     def compose_report_3(self):
         """
         BOM without elements from components dict
-        :return:
+        :return: None
         """
 
         if not self.cache_reports_dict[self.report_0_name]:
@@ -664,9 +742,9 @@ class MyApp(QWidget):
             report_df = notnull_report_df
         else:
 
-            notnull_report_dict = DictMaker().make_dict_from_df(notnull_report_df, 'Артикул', 'q-ty')
-
-            report_df = self.read_sp_plat(notnull_report_df, info_text, notnull_report_dict)
+            report_df = self.read_sp_plat(notnull_report_df,
+                                          info_text,
+                                          )
 
             info_text = self.report_info_label_text
 
@@ -687,7 +765,7 @@ class MyApp(QWidget):
         """
         bad balance for components in moduls
 
-        :return:
+        :return: None
         """
 
         if not self.cache_reports_dict[self.report_3_name]:
@@ -696,8 +774,6 @@ class MyApp(QWidget):
         report_df, info_text = self.cache_reports_dict[self.report_3_name]
 
         if report_df is None or report_df.empty:
-            # quantity_min = report_df['Штук можно изготовить'].min()
-            # info_text += f'Компонентов на складе достаточно для изготовления {quantity_min} заказов.\n'
             self.cache_reports_dict[self.report_4_name] = (report_df, info_text)
             return None
         else:
@@ -708,12 +784,16 @@ class MyApp(QWidget):
             self.cache_reports_dict[self.report_4_name] = (report_df, info_text)
 
     def prepare_stock_df(self):
+        """
+
+        :return: None
+        """
         cols = 'C, D, G, I, K'
         sheet_name = 'Склад'
         self.stock_df, self.msg, self.color = DataReader(
             PATH_TO_FILE_STOCK, FILE_STOCK).read_data_from_stock_file(sheet_name, cols)
 
-        self.stock_df = self.stock_df.iloc[12:]
+        # self.stock_df = self.stock_df.iloc[12:]
 
         self.stock_df = self.stock_df.dropna(subset=['Артикул'])
 
@@ -740,6 +820,12 @@ class MyApp(QWidget):
             'Склад основной', 'Цена, $', 'Цена, EURO']].astype(float)
 
     def calculate_price(self, components_from_modules_df, info_text):
+        """
+
+        :param components_from_modules_df: DF
+        :param info_text: str
+        :return: report_stock_df: DF
+        """
 
         components_from_modules_dict = DictMaker().make_dict_from_df(
             components_from_modules_df,

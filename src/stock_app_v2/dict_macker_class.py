@@ -45,3 +45,19 @@ class DictMaker:
             for kv in modul_df[[col_name1, col_name2]].values:
                 modul_dict.update({int(kv[0]): fabs(kv[1])})
         return modul_dict
+
+    @staticmethod
+    def remove_zero_values(input_str):
+        error_dict = {}
+        input_dict = eval(input_str)
+
+        for k, v in input_dict.items():
+            if float(v) == 0.0:
+                error_dict[k] = v
+
+        for k in error_dict.keys():
+            input_dict.pop(k)
+
+        output_dict = input_dict
+
+        return output_dict, error_dict

@@ -1,55 +1,44 @@
-import sys
 
 import pytest
-import os
 
 import pandas as pd
 from PyQt5.QtWidgets import QApplication
 
 from stock_app_v2.stock_app import MyApp
-from stock_app_v2.data_reader_class import DataReader
-
-# from stock_app_v2.stock_app import FILE_OF_PRODUCTS, COLUMN_PRODUCT_NAMES
+from stock_app_v2.stock_app import COLUMN_PRODUCT_NAMES, COLUMN_DICT_OF_MODULS, COLUMN_DICT_OF_COMPONENTS
 
 # TEST_PATH = 'test_data_reader/data_test.csv'
 TEST_FILE_OF_PRODUCTS = 'data_test.csv'
 # TEST_PATH = f'D:/OEMTECH/Projects/stock_app_v2/src/tests/test_data_reader/{TEST_FILE_OF_PRODUCTS}'
 TEST_PATH = f'../tests/test_stock_app/'  # {TEST_FILE_OF_PRODUCTS}'
 # TEST_PATH = TEST_FILE_OF_PRODUCTS
-TEST_COLUMN_1 = 'наименование блока'
-TEST_COLUMN_2 = 'словарь модулей'
+
+
+TEST_COLUMN_1 = COLUMN_PRODUCT_NAMES
+TEST_COLUMN_2 = COLUMN_DICT_OF_MODULS
+TEST_COLUMN_3 = COLUMN_DICT_OF_COMPONENTS
 
 TEST_DF_1 = pd.DataFrame({
-    'наименование блока': ['тест_блок'],
-    'словарь модулей': ['{2: 2, 55:1, 44: 8, 954: 1}'],
+    TEST_COLUMN_1: ['тест_блок'],
+    TEST_COLUMN_2: ['{2: 2, 55:1, 44: 8, 954: 1}'],
+    TEST_COLUMN_3: ['{}'],
 })
 TEST_DF_2 = pd.DataFrame({
-    'наименование блока': ['тест_блок'],
-    'словарь модулей': ['{22: 2, 255: 1, 244: 8, 2954: 1}'],
+    TEST_COLUMN_1: ['тест_блок'],
+    TEST_COLUMN_2: ['{22: 2, 255: 1, 244: 8, 2954: 1}'],
+    TEST_COLUMN_3: ['{}'],
 })
 TEST_DF_3 = pd.DataFrame({
-    'наименование блока': ['тест_блок_2'],
-    'словарь модулей': ['{12: 2, 112: 3, 155: 1, 144: 8, 1954: 1}'],
+    TEST_COLUMN_1: ['тест_блок_2'],
+    TEST_COLUMN_2: ['{12: 2, 112: 3, 155: 1, 144: 8, 1954: 1}'],
+    TEST_COLUMN_3: ['{}'],
 })
 
 TEST_DF_4 = pd.DataFrame({
-    'наименование блока': ['тест_блок', 'тест_блок_2'],
-    'словарь модулей': ['{22: 2, 255: 1, 244: 8, 2954: 1}','{12: 2, 112: 3, 155: 1, 144: 8, 1954: 1}'],
+    TEST_COLUMN_1: ['тест_блок', 'тест_блок_2'],
+    TEST_COLUMN_2: ['{22: 2, 255: 1, 244: 8, 2954: 1}', '{12: 2, 112: 3, 155: 1, 144: 8, 1954: 1}'],
+    TEST_COLUMN_3: ['{}', {}],
 })
-# def test_1():
-#     app = QApplication([])
-#     ex = MyApp()
-#     res_1 = ex.color
-#     res_2 = ex.block_list_dict
-#     assert res_1 == 'blue'
-#     assert res_2 == {}
-#
-# def test_2():
-#     app = QApplication([])
-#     ex = MyApp()
-#     ex.update_info_label
-#     res_1 = ex.color
-#     assert res_1 == 'blue'
 
 
 @pytest.mark.parametrize('path, file_name, column_name, expected_result',
@@ -67,6 +56,7 @@ def test_file_csv_reading(create_test_csv_file_fin, path, file_name, column_name
     # ex.update_info_label
     res_1 = ex.color
     assert res_1 == expected_result
+
 
 @pytest.mark.parametrize('path, file_name, column_name, idx, expected_result',
                          [
@@ -106,8 +96,6 @@ def test_file_csv_reading_2(create_test_csv_file_fin, path, file_name, column_na
 def test_file_csv_reading_2(create_test_csv_file_fin, path, file_name, column_name, text, expected_result):
     app = QApplication([])
     ex = MyApp(path, file_name, column_name)
-    # if new string in input it automatically adds to the comboBox with text and index after ENTER
-    # here we should add new item manually to pass test
     if text != 'Обновить поиск':
         ex.comboBox.addItems([text])
         ex.comboBox.setCurrentIndex(ex.comboBox.count()-1)

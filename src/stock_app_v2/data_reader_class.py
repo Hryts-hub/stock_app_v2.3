@@ -52,9 +52,10 @@ class DataReader:
                 self.color = 'blue'
             except Exception as e:
                 self.color = 'red'
-                self.msg = f'ОШИБКА bom+цена {type(e)}: {e}'
+                self.msg = f'ОШИБКА: {type(e)}: {e}'
         else:
             self.color = 'red'
             self.msg = f'{self.path_to_file}{self.file_name} -- не найден.'
+
         return self.data, self.msg, self.color
 

@@ -76,7 +76,7 @@ class ReportMaker:
         # quantity_min = filtered_modul_df['Штук можно изготовить'].min()
         return (
             bad_balance_dict,
-            bad_balance_df[['Артикул', 'balance']],
+            bad_balance_df[['Артикул', 'q-ty', 'balance']],
             # int(quantity_min),
             good_balance_dict.keys()
         )

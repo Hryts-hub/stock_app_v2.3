@@ -6,26 +6,35 @@ import pandas as pd
 from stock_app_v2.data_reader_class import DataReader
 
 # from stock_app_v2.stock_app import FILE_OF_PRODUCTS, COLUMN_PRODUCT_NAMES
+from stock_app_v2.stock_app import COLUMN_PRODUCT_NAMES, COLUMN_DICT_OF_MODULS, COLUMN_DICT_OF_COMPONENTS
 
 # TEST_PATH = 'test_data_reader/data_test.csv'
 TEST_FILE_OF_PRODUCTS = 'data_test.csv'
 # TEST_PATH = f'D:/OEMTECH/Projects/stock_app_v2/src/tests/test_data_reader/{TEST_FILE_OF_PRODUCTS}'
 TEST_PATH = f'../tests/test_data_reader/'  # {TEST_FILE_OF_PRODUCTS}'
 # TEST_PATH = TEST_FILE_OF_PRODUCTS
-TEST_COLUMN_1 = 'наименование блока'
-TEST_COLUMN_2 = 'словарь модулей'
+# TEST_COLUMN_1 = 'наименование блока'
+# TEST_COLUMN_2 = 'словарь модулей'
+# TEST_COLUMN_3 = 'словарь эл.компонентов'
+
+TEST_COLUMN_1 = COLUMN_PRODUCT_NAMES
+TEST_COLUMN_2 = COLUMN_DICT_OF_MODULS
+TEST_COLUMN_3 = COLUMN_DICT_OF_COMPONENTS
 
 TEST_DF_1 = pd.DataFrame({
-    'наименование блока': ['тест_блок'],
-    'словарь модулей': ['{2: 2, 55:1, 44: 8, 954: 1}'],
+    TEST_COLUMN_1: ['тест_блок'],
+    TEST_COLUMN_2: ['{2: 2, 55:1, 44: 8, 954: 1}'],
+    TEST_COLUMN_3: ['{}'],
 })
 TEST_DF_2 = pd.DataFrame({
-    'наименование блока': ['тест_блок'],
-    'словарь модулей': ['{22: 2, 255: 1, 244: 8, 2954: 1}'],
+    TEST_COLUMN_1: ['тест_блок'],
+    TEST_COLUMN_2: ['{22: 2, 255: 1, 244: 8, 2954: 1}'],
+    TEST_COLUMN_3: ['{}'],
 })
 TEST_DF_3 = pd.DataFrame({
-    'наименование блока': ['тест_блок_2'],
-    'словарь модулей': ['{12: 2, 112: 3, 155: 1, 144: 8, 1954: 1}'],
+    TEST_COLUMN_1: ['тест_блок_2'],
+    TEST_COLUMN_2: ['{12: 2, 112: 3, 155: 1, 144: 8, 1954: 1}'],
+    TEST_COLUMN_3: ['{}'],
 })
 
 @pytest.mark.parametrize('path, file_name, column_name, expected_result',
@@ -97,3 +106,4 @@ def test_add_to_file_csv_2(path, file_name, df, expected_result):
     DataReader(path, file_name).add_to_file_csv(TEST_DF_2)
     res = DataReader(path, file_name).add_to_file_csv(df)
     assert res == expected_result
+

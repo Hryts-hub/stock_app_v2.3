@@ -18,10 +18,10 @@ from stock_app_v2.report_window_class import ReportWindow
 from stock_app_v2.validator_class import Validator
 
 # file with names of products and dicts of moduls
-# FILE_OF_PRODUCTS = 'data.csv'
-FILE_OF_PRODUCTS = 'data_3_col.csv'
-PATH_TO_FILE_OF_PRODUCTS = 'D:/OEMTECH/Projects/FILE_STOCK_FOLDER/'  # {FILE_OF_PRODUCTS}'
-# PATH_TO_FILE_OF_PRODUCTS = 'Z:/Склад/'
+FILE_OF_PRODUCTS = 'data.csv'
+# FILE_OF_PRODUCTS = 'data_3_col.csv'
+# PATH_TO_FILE_OF_PRODUCTS = 'D:/OEMTECH/Projects/FILE_STOCK_FOLDER/'  # {FILE_OF_PRODUCTS}'
+PATH_TO_FILE_OF_PRODUCTS = 'Z:/Склад/'
 
 # columns in this file = columns in data frame
 COLUMN_PRODUCT_NAMES = 'наименование блока'
@@ -31,8 +31,8 @@ COLUMN_DICT_OF_COMPONENTS = 'словарь эл.компонентов'
 
 FILE_STOCK = 'Склад 14.01.16.xlsx'
 # FILE_STOCK = 'Z:/Склад/Склад 14.01.16.xlsx'
-PATH_TO_FILE_STOCK = 'D:/OEMTECH/Projects/FILE_STOCK_FOLDER/'
-# PATH_TO_FILE_STOCK = 'Z:/Склад/'
+# PATH_TO_FILE_STOCK = 'D:/OEMTECH/Projects/FILE_STOCK_FOLDER/'
+PATH_TO_FILE_STOCK = 'Z:/Склад/'
 
 
 # FILE_OF_SP_PLAT # Склад 14.01.16
@@ -548,7 +548,7 @@ class MyApp(QWidget):
         :return: None
         """
         sheet_name = 'Склад модулей(узлов)'
-        cols = 'C,F,G'
+        cols = 'C,F,G, H'  # col H added
         self.modul_df, self.msg, self.color = DataReader(
             PATH_TO_FILE_STOCK, FILE_STOCK).read_data_from_stock_file(sheet_name, cols)
         self.modul_df = self.modul_df.iloc[2:]
@@ -788,7 +788,7 @@ class MyApp(QWidget):
 
         :return: None
         """
-        cols = 'C, D, G, I, K'
+        cols = 'C, D, E, G, I, K, L, M, N, O'  # added E, L, M, N, O
         sheet_name = 'Склад'
         self.stock_df, self.msg, self.color = DataReader(
             PATH_TO_FILE_STOCK, FILE_STOCK).read_data_from_stock_file(sheet_name, cols)
@@ -803,7 +803,11 @@ class MyApp(QWidget):
 
         for val in self.stock_df['Склад основной'].values:
             self.stock_df.loc[self.stock_df['Склад основной'] == val, 'Склад основной'] = 0 if (
-                not str(val).replace(',', '').isdigit()) else val
+                not str(val).replace('.', '').isdigit()) else val  # ',' --> '.'    BUG FIXED
+            # if type(val) != int:
+            #     print(val)
+            #     print(type(val))
+
 
         for val in self.stock_df['Цена, $'].values:
             self.stock_df.loc[self.stock_df['Цена, $'] == val, 'Цена, $'] = 0 if (

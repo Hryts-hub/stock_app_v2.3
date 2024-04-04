@@ -59,7 +59,7 @@ class Validator:
 
         self.flag = False if moduls_dict_str == components_dict_str == '{}' else (flag_moduls and flag_components)
         if self.flag:
-            self.msg += f'модули: {moduls_dict_str},\nкомпоненты: {components_dict_str}'
+            self.msg += f'модули: {moduls_dict_str},\nкомпоненты: {components_dict_str}\n'
         else:
             self.msg += f'Не удалось заполнить словари данными. \nМодули: {msg_moduls} \nКомпоненты: {msg_components}\n'
 

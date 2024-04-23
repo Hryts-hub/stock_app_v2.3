@@ -1,9 +1,10 @@
 #!/usr/bin/python3
 # -*- coding: utf-8 -*-
-
+from datetime import datetime, date, time
 import sys
 from collections import defaultdict
 
+import numpy as np
 import pandas as pd
 # to disable warnings
 # pd.options.mode.chained_assignment = None  # default='warn'
@@ -18,10 +19,10 @@ from stock_app_v2.report_window_class import ReportWindow
 from stock_app_v2.validator_class import Validator
 
 # file with names of products and dicts of moduls
-FILE_OF_PRODUCTS = 'data.csv'
-# FILE_OF_PRODUCTS = 'data_3_col.csv'
-# PATH_TO_FILE_OF_PRODUCTS = 'D:/OEMTECH/Projects/FILE_STOCK_FOLDER/'  # {FILE_OF_PRODUCTS}'
-PATH_TO_FILE_OF_PRODUCTS = 'Z:/Склад/'
+#FILE_OF_PRODUCTS = 'data.csv'
+FILE_OF_PRODUCTS = 'data_3_col.csv'
+PATH_TO_FILE_OF_PRODUCTS = 'D:/OEMTECH/Projects/FILE_STOCK_FOLDER/'  # {FILE_OF_PRODUCTS}'
+# PATH_TO_FILE_OF_PRODUCTS = 'Z:/Склад/'
 
 # columns in this file = columns in data frame
 COLUMN_PRODUCT_NAMES = 'наименование блока'
@@ -31,8 +32,9 @@ COLUMN_DICT_OF_COMPONENTS = 'словарь эл.компонентов'
 
 FILE_STOCK = 'Склад 14.01.16.xlsx'
 # FILE_STOCK = 'Z:/Склад/Склад 14.01.16.xlsx'
-# PATH_TO_FILE_STOCK = 'D:/OEMTECH/Projects/FILE_STOCK_FOLDER/'
-PATH_TO_FILE_STOCK = 'Z:/Склад/'
+# D:\OEMTECH\Projects\FILE_STOCK_FOLDER\stock_versions\stock_5026
+PATH_TO_FILE_STOCK = 'D:/OEMTECH/Projects/FILE_STOCK_FOLDER/stock_versions/stock_5026/'
+# PATH_TO_FILE_STOCK = 'Z:/Склад/'
 
 
 # FILE_OF_SP_PLAT # Склад 14.01.16
@@ -680,6 +682,9 @@ class MyApp(QWidget):
                 self.progress_bar.setValue(70)
 
                 report_df = ReportMaker(big_bom_df).make_report_2(col_moduls_dict)
+
+                report_df.rename(columns={'Unnamed: 3': 'Подвид', 'Unnamed: 4': 'Название'}, inplace=True)
+
                 return report_df
 
     def compose_report_2(self):
@@ -702,9 +707,15 @@ class MyApp(QWidget):
                                           # bad_balance_report_dict
                                           )
             info_text = self.report_info_label_text
-            deficit_df = report_df[['Артикул', 'Unnamed: 3', 'Unnamed: 4',
+            # print('1')
+            # report_df.rename(columns={'Unnamed: 3': 'Подвид', 'Unnamed: 4': 'Название'}, inplace=True)
+            # print(report_df.columns)
+            deficit_df = report_df[['Артикул',
+                                    # 'Unnamed: 3', 'Unnamed: 4',
+                                    'Подвид', 'Название',
                                  'Склад основной', 'sum_components',
                                  'Штук можно изготовить', 'balance']][report_df['balance'] < 0]
+            # print('2')
 
             proficit = report_df[['Артикул', 'balance']][report_df['balance'] >= 0]
             proficit_dict = DictMaker().make_dict_from_df(proficit, 'Артикул', 'balance')
@@ -748,7 +759,9 @@ class MyApp(QWidget):
 
             info_text = self.report_info_label_text
 
-            report_df = report_df[['Артикул', 'Unnamed: 3', 'Unnamed: 4',
+            report_df = report_df[['Артикул',
+                                   # 'Unnamed: 3', 'Unnamed: 4',
+                                   'Подвид', 'Название',
                                      'Склад основной', 'sum_components',
                                      'Штук можно изготовить', 'balance']]
 
@@ -777,7 +790,9 @@ class MyApp(QWidget):
             self.cache_reports_dict[self.report_4_name] = (report_df, info_text)
             return None
         else:
-            report_df = report_df[['Артикул', 'Unnamed: 3', 'Unnamed: 4',
+            report_df = report_df[['Артикул',
+                                   # 'Unnamed: 3', 'Unnamed: 4',
+                                   'Подвид', 'Название',
                                  'Склад основной', 'sum_components',
                                  'Штук можно изготовить', 'balance']][(report_df['balance'] < 0)]
 
@@ -788,7 +803,8 @@ class MyApp(QWidget):
 
         :return: None
         """
-        cols = 'C, D, E, G, I, K, L, M, N, O'  # added E, L, M, N, O
+        print('prepare_stock_df')
+        cols = 'C, D, E, G, I, K, L, M, N, O, Q'  # added E, L, M, N, O +Q
         sheet_name = 'Склад'
         self.stock_df, self.msg, self.color = DataReader(
             PATH_TO_FILE_STOCK, FILE_STOCK).read_data_from_stock_file(sheet_name, cols)
@@ -798,6 +814,7 @@ class MyApp(QWidget):
         self.stock_df = self.stock_df.dropna(subset=['Артикул'])
 
         self.stock_df = self.stock_df.astype({'Артикул': int})
+        # self.stock_df = self.stock_df.astype({'Артикул осн.': int}) nan is float ((
 
         self.stock_df[['Склад основной', 'Цена, $']] = self.stock_df[['Склад основной', 'Цена, $']].fillna(0)
 
@@ -807,7 +824,6 @@ class MyApp(QWidget):
             # if type(val) != int:
             #     print(val)
             #     print(type(val))
-
 
         for val in self.stock_df['Цена, $'].values:
             self.stock_df.loc[self.stock_df['Цена, $'] == val, 'Цена, $'] = 0 if (
@@ -823,12 +839,94 @@ class MyApp(QWidget):
         self.stock_df[['Склад основной', 'Цена, $', 'Цена, EURO']] = self.stock_df[[
             'Склад основной', 'Цена, $', 'Цена, EURO']].astype(float)
 
-    def calculate_price(self, components_from_modules_df, info_text):
+        self.stock_df['Статус замены'] = ''
+        self.stock_df['Статус замены'].loc[self.stock_df['Артикул осн.'].notnull()] = 'Состав по док.'
+        self.stock_df['Статус замены'].loc[self.stock_df['Артикул осн.'].isnull()] = 'Нет замены'
+
+        # *------------
+        # print(len(self.stock_df))
+        offset = 2
+        cell_names_dict = {'I1': ['I' + str(x) for x in range(offset, len(self.stock_df)+1)]}
+        # print(cell_names_dict['I1'][-1])
+
+        comment_dict = DataReader(
+            PATH_TO_FILE_STOCK, FILE_STOCK).read_comments_from_stock_file_by_openpyxl(
+            sheet_name, cell_names_dict)
+
+        res_data = {'comments': comment_dict['Склад основной']}
+
+        df = pd.DataFrame(res_data)
+        # df.index += offset
+        # print(len(df))
+        # print(len(comment_dict['Склад основной']))
+        # print(comment_dict['Склад основной'])
+        # print(comment_dict.keys())
+
+        self.stock_df['comments'] = df[['comments']]
+        # print(self.stock_df.columns)
+        # print(self.stock_df.tail(3))
+        self.stock_df['comments'] = self.stock_df['comments'].fillna('')
+        k = 0  # index of the row
+        for i in self.stock_df[:]['comments']:
+            # print(k, i)
+            i = i.split('\n')
+            # self.stock_df['comments'].values[k] = i
+            # if k < 13:
+            #     print(k, i)
+            # k += 1
+
+        # self.stock_df['comments_1'] = self.stock_df['comments']
+        # k = 0
+        # for i in self.stock_df['comments'].values:
+            if i != []:
+                # print(k,'=======')
+                # if k < 13:
+                #     print(k, i)
+
+                s = [[x for x in aa.split(' ') if x != ''] for aa in i if aa != '']
+                # if k < 13:
+                #     print(s)
+                ss = []
+                for x in s:
+                    if len(x) > 1 and x[0][-1].isdigit() and x[1][0].isalpha():
+                        # elem = (x[0][-8:] + x[1][:2].upper()) if x[1][:2].upper() not in ['НА', 'МИ', 'КО', 'АЛ', 'БЕ',
+                        #                                                                   'ВЕ', 'СВ'] else (
+                        #             x[0][-8:] + x[1][:4].upper())
+                        elem = x[0][-8:]
+                        ss.append(elem)
+                # if k < 13:
+                #     print(ss)
+
+                # self.stock_df['comments'].values[k] = ss
+                z = [x.replace('/', '.') for x in ss]
+                z = [x.replace('-', '0') for x in z]
+                z = [x[:6] + '20' + x[6:8] for x in z]
+                # if k < 13:
+                #     print(k, z)
+                if z:
+                    # if k < 13:
+                    #     print(k, z[-1])
+                    # dt = datetime.strptime(z[-1], "%d.%m.%y")
+                    # if k < 13:
+                    #     print(k, z[-1], dt)
+                    self.stock_df['comments'].values[k] = z[-1]
+                    # self.stock_df['comments'].values[k] = dt
+                else:
+                    self.stock_df['comments'].values[k] = ''
+
+            else:
+                self.stock_df['comments'].values[k] = ''
+
+            k += 1
+
+        self.stock_df['date'] = pd.to_datetime(self.stock_df['comments'], format='%d.%m.%Y', errors='coerce')
+        print('END prepare_stock_df')
+
+
+    def prepare_block_report_df(self, components_from_modules_df):
         """
 
-        :param components_from_modules_df: DF
-        :param info_text: str
-        :return: report_stock_df: DF
+        :return:
         """
 
         components_from_modules_dict = DictMaker().make_dict_from_df(
@@ -851,6 +949,37 @@ class MyApp(QWidget):
         [compo_data['quantity'].append(v) for v in res_compo_dict.values()]
         res_compo_df = pd.DataFrame.from_dict(compo_data)
 
+        return res_compo_df
+
+    def prepare_modul_report_df(self, components_from_modules_df):
+        """
+
+        :return:
+        """
+
+        components_from_modules_dict = DictMaker().make_dict_from_df(
+            components_from_modules_df,
+            'Артикул',
+            'sum_components'
+        )
+
+        res_compo_dict = components_from_modules_dict
+
+        compo_data = defaultdict(list)
+        [compo_data['Артикул'].append(k) for k in res_compo_dict.keys()]
+        [compo_data['quantity'].append(v) for v in res_compo_dict.values()]
+        res_compo_df = pd.DataFrame.from_dict(compo_data)
+
+        return res_compo_df
+
+    def calculate_price(self, res_compo_df, info_text):
+        """
+
+        :param components_from_modules_df: DF
+        :param info_text: str
+        :return: report_stock_df: DF
+        """
+        print('calculate_price')
         if res_compo_df.empty:
             report_stock_df = pd.DataFrame()
         else:
@@ -859,6 +988,116 @@ class MyApp(QWidget):
                 self.prepare_stock_df()
 
             report_stock_df = res_compo_df.merge(self.stock_df, how='left', on='Артикул')
+
+            report_stock_df['Артикул без замен'] = report_stock_df['Артикул']
+
+            doc_report_stock_df = report_stock_df.loc[report_stock_df['Статус замены'] == 'Состав по док.']
+
+            # --------------------
+
+            main_res_report_stock_df = report_stock_df[['Артикул', 'quantity']].loc[
+                report_stock_df['Статус замены'] == 'Состав по док.']
+
+            main_res_report_stock_df['Артикул'] = (
+                report_stock_df['Артикул осн.'].loc[
+                    report_stock_df['Статус замены'] == 'Состав по док.'].astype('int32')
+            )
+
+            main_res_report_stock_df = main_res_report_stock_df[['Артикул', 'quantity']]
+
+            main_replace_df = main_res_report_stock_df.merge(self.stock_df, how='left', on='Артикул')
+
+            main_replace_df['Артикул без замен'] = main_replace_df['Артикул']
+
+            main_replace_df['Артикул'] = main_replace_df['Артикул осн.']
+            main_report_stock_df = main_replace_df.sort_values('Артикул')
+            main_report_stock_df['Статус замены'] = 'Состав по артикулу "осн."'
+
+            #--------------------
+            main_stock_df = self.stock_df.copy(deep=True)
+            main_stock_df['Артикул без замен'] = main_stock_df['Артикул']
+            main_stock_df['Артикул'].loc[main_stock_df['Артикул осн.'].notnull()] = (
+                main_stock_df['Артикул осн.'].loc[main_stock_df['Артикул осн.'].notnull()].astype('int32')
+            )
+
+            max_report_stock_df = main_report_stock_df[[
+                'Артикул', 'quantity']].merge(main_stock_df, how='left', on='Артикул')
+            # print('max_report_stock_df')
+            # print(max_report_stock_df)
+
+            max_group_df = max_report_stock_df.groupby('Артикул осн.').agg({'Цена, $': ['max']})  #
+            # print(max_group_df)
+            min_group_df = max_report_stock_df.groupby('Артикул осн.').agg({'Цена, $': ['min']})  #
+            # print(min_group_df)
+
+            max_group_df.columns = max_group_df.columns.map('_'.join)
+            min_group_df.columns = min_group_df.columns.map('_'.join)
+            # print(max_group_df)
+
+            max_group_df = max_group_df.rename_axis(None, axis=1)  # ?
+            min_group_df = min_group_df.rename_axis(None, axis=1)  # ?
+            max_p_report_stock_df = max_report_stock_df.merge(
+                max_group_df, how='left', on='Артикул осн.')
+            # print('max')
+
+            max_p_report_stock_df = max_p_report_stock_df.loc[
+                max_p_report_stock_df['Цена, $'] == max_p_report_stock_df['Цена, $_max']]
+            max_p_report_stock_df['Статус замены'] = 'Состав, МАХ цена'
+            max_p_report_stock_df = max_p_report_stock_df.drop(columns=['Цена, $_max'])
+            max_p_report_stock_df['Артикул'] = max_p_report_stock_df['Артикул без замен']
+            # print(max_p_report_stock_df)
+
+
+            min_pm_report_stock_df = max_report_stock_df.merge(
+                min_group_df, how='left', on='Артикул осн.')
+            # print('min')
+
+            min_pm_report_stock_df = min_pm_report_stock_df.loc[
+                min_pm_report_stock_df['Цена, $'] == min_pm_report_stock_df['Цена, $_min']]
+            min_pm_report_stock_df['Статус замены'] = 'Состав, MIN цена'
+            min_pm_report_stock_df = min_pm_report_stock_df.drop(columns=['Цена, $_min'])
+
+            min_pm_report_stock_df['Артикул'] = min_pm_report_stock_df['Артикул без замен']
+            # print(min_pm_report_stock_df)
+
+            # --------------------
+            max_dt_group_df = max_report_stock_df.groupby('Артикул осн.').agg({'date': ['max']})
+
+            max_dt_group_df.columns = max_dt_group_df.columns.map('_'.join)
+
+            max_dt_group_df = max_dt_group_df.rename_axis(None, axis=1)
+
+            max_dt_report_stock_df = max_report_stock_df.merge(max_dt_group_df, how='left', on='Артикул осн.')
+
+            max_dt_report_stock_df = max_dt_report_stock_df.loc[
+                max_dt_report_stock_df['date'] == max_dt_report_stock_df['date_max']]
+            gr = max_dt_report_stock_df.groupby(['Артикул']).size().reset_index(name='counts')
+            gr_dupl = gr.loc[gr['counts'] > 1]
+            # print('------------')
+            date_dupl_df = max_dt_report_stock_df.loc[max_dt_report_stock_df['Артикул'].isin(gr_dupl['Артикул'])]
+            # print(date_dupl_df)
+            date_dedupl_df = date_dupl_df.loc[date_dupl_df['Артикул'] == date_dupl_df['Артикул без замен']]
+            # print(date_dedupl_df)
+            date_not_dupl_df = max_dt_report_stock_df.loc[~max_dt_report_stock_df['Артикул'].isin(gr_dupl['Артикул'])]
+            # print(date_not_dupl_df)
+            max_dt_report_stock_df = pd.concat([
+                date_not_dupl_df,
+                date_dedupl_df,
+            ], ignore_index=True)
+
+            max_dt_report_stock_df['Статус замены'] = 'Состав, ДАТА'
+            max_dt_report_stock_df = max_dt_report_stock_df.drop(columns=['date_max'])
+            max_dt_report_stock_df['Артикул'] = max_dt_report_stock_df['Артикул без замен']
+            # --------------------
+
+            report_stock_df = pd.concat([
+                report_stock_df,
+                main_report_stock_df,
+                max_p_report_stock_df,
+                min_pm_report_stock_df,
+                max_dt_report_stock_df,
+            ], ignore_index=True)
+            # --------------------
 
             not_found_df = report_stock_df[report_stock_df['Название\n(Комплектующие склада)'].isnull()]
             not_found_dict = DictMaker().make_dict_from_df(not_found_df, 'Артикул', 'quantity')
@@ -871,22 +1110,46 @@ class MyApp(QWidget):
                 info_text += 'Все компоненты указаны корректно. \n'
 
             report_stock_df['total $'] = report_stock_df['quantity'] * report_stock_df['Цена, $']
+            dollar_price = round(report_stock_df['total $'].loc[(
+                    report_stock_df['Статус замены'] == 'Состав по док.') | (
+                    report_stock_df['Статус замены'] == 'Нет замены')].sum(), 2)
+
+            max_dollar_price = round(report_stock_df['total $'].loc[(
+                    report_stock_df['Статус замены'] == 'Состав, МАХ цена') | (
+                    report_stock_df['Статус замены'] == 'Нет замены')].sum(), 2)
+            #-----
+            report_stock_df['% Доля\nстоимости компонента\nв стоимости известного состава'] = np.nan
+            report_stock_df[
+                '% Доля\nстоимости компонента\nв стоимости известного состава'
+            ].loc[
+                (report_stock_df['total $'] > 0)
+            ] = round((100 * report_stock_df['total $'].loc[report_stock_df['total $'] > 0] / dollar_price), 2)
+
             report_stock_df['total EURO'] = report_stock_df['quantity'] * report_stock_df['Цена, EURO']
 
-            dollar_price = round(report_stock_df['total $'].sum(), 2)
-            euro_price = round(report_stock_df['total EURO'].sum(), 2)
+            euro_price = round(report_stock_df['total EURO'].loc[(
+                    report_stock_df['Статус замены'] == 'Состав по док.') | (
+                    report_stock_df['Статус замены'] == 'Нет замены')].sum(), 2)
 
-            info_text += f'Цена = {dollar_price} $ + {euro_price} euro \n'
+            info_text += f'Цена (состав по док. по комп. с известной ценой) = {dollar_price} $ + {euro_price} euro\n'
+            info_text += f'MAX Цена = {max_dollar_price} $ \n'
 
             null_df = report_stock_df[(report_stock_df['Цена, $'] == 0) & (report_stock_df['Цена, EURO'] == 0)]
             null_price_list = list(null_df['Артикул'])
             if null_price_list:
                 info_text += f'НЕТ ЦЕНЫ для этих компонентов (артикулы): {null_price_list} \n'
 
+            report_stock_df.loc[:, 'balance'] = report_stock_df['Склад основной'] - report_stock_df['quantity']
+
+            report_stock_df['Артикул'] = report_stock_df['Артикул'].astype('int32')
+
+            if not euro_price:
+                report_stock_df = report_stock_df.drop(['Цена, EURO', 'total EURO'], axis=1)
+
         self.report_info_label_text = info_text
 
         self.report_info_label.setText(self.report_info_label_text)
-
+        print('END calculate_price')
         self.progress_bar.setValue(95)
         return report_stock_df
 
@@ -896,8 +1159,9 @@ class MyApp(QWidget):
             self.compose_report_3()
 
         components_from_modules_df, info_text = self.cache_reports_dict[self.report_3_name]
+        report_df = self.prepare_block_report_df(components_from_modules_df)
 
-        report_stock_df = self.calculate_price(components_from_modules_df, info_text)
+        report_stock_df = self.calculate_price(report_df, info_text)
 
         if report_stock_df is None or report_stock_df.empty:
             info_text += 'БОМ пуст!'
@@ -910,16 +1174,16 @@ class MyApp(QWidget):
 
     def compose_report_6(self):
 
-        if not self.cache_reports_dict[self.report_4_name]:
-            self.compose_report_4()
+        if not self.cache_reports_dict[self.report_5_name]:
+            self.compose_report_5()
 
-        components_from_modules_df, info_text = self.cache_reports_dict[self.report_4_name]
+        report_stock_df, info_text = self.cache_reports_dict[self.report_5_name]
 
-        report_stock_df = self.calculate_price(components_from_modules_df, info_text)
+        report_stock_df = report_stock_df[report_stock_df['balance'] < 0]
 
         if report_stock_df is None or report_stock_df.empty:
             info_text += 'По БОМ нет недостающих компонентов'
-            self.cache_reports_dict[self.report_6_name] = (components_from_modules_df, info_text)
+            self.cache_reports_dict[self.report_6_name] = (report_stock_df, info_text)
             return None
 
         info_text = self.report_info_label_text
@@ -933,7 +1197,11 @@ class MyApp(QWidget):
 
         components_from_modules_df, info_text = self.cache_reports_dict[self.report_2_name]
 
-        report_stock_df = self.calculate_price(components_from_modules_df, info_text)
+        report_df = self.prepare_modul_report_df(components_from_modules_df)
+
+        report_stock_df = self.calculate_price(report_df, info_text)
+
+        report_stock_df = report_stock_df[report_stock_df['balance'] < 0]
 
         if report_stock_df is None or report_stock_df.empty:
             info_text += 'Нет недостающих компонентов в недостающих модулях'

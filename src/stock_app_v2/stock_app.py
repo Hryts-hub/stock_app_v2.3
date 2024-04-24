@@ -19,10 +19,10 @@ from stock_app_v2.report_window_class import ReportWindow
 from stock_app_v2.validator_class import Validator
 
 # file with names of products and dicts of moduls
-#FILE_OF_PRODUCTS = 'data.csv'
-FILE_OF_PRODUCTS = 'data_3_col.csv'
-PATH_TO_FILE_OF_PRODUCTS = 'D:/OEMTECH/Projects/FILE_STOCK_FOLDER/'  # {FILE_OF_PRODUCTS}'
-# PATH_TO_FILE_OF_PRODUCTS = 'Z:/Склад/'
+FILE_OF_PRODUCTS = 'data.csv'
+# FILE_OF_PRODUCTS = 'data_3_col.csv'
+# PATH_TO_FILE_OF_PRODUCTS = 'D:/OEMTECH/Projects/FILE_STOCK_FOLDER/'  # {FILE_OF_PRODUCTS}'
+PATH_TO_FILE_OF_PRODUCTS = 'Z:/Склад/'
 
 # columns in this file = columns in data frame
 COLUMN_PRODUCT_NAMES = 'наименование блока'
@@ -33,8 +33,8 @@ COLUMN_DICT_OF_COMPONENTS = 'словарь эл.компонентов'
 FILE_STOCK = 'Склад 14.01.16.xlsx'
 # FILE_STOCK = 'Z:/Склад/Склад 14.01.16.xlsx'
 # D:\OEMTECH\Projects\FILE_STOCK_FOLDER\stock_versions\stock_5026
-PATH_TO_FILE_STOCK = 'D:/OEMTECH/Projects/FILE_STOCK_FOLDER/stock_versions/stock_5026/'
-# PATH_TO_FILE_STOCK = 'Z:/Склад/'
+# PATH_TO_FILE_STOCK = 'D:/OEMTECH/Projects/FILE_STOCK_FOLDER/stock_versions/stock_5026/'
+PATH_TO_FILE_STOCK = 'Z:/Склад/'
 
 
 # FILE_OF_SP_PLAT # Склад 14.01.16
@@ -988,6 +988,8 @@ class MyApp(QWidget):
                 self.prepare_stock_df()
 
             report_stock_df = res_compo_df.merge(self.stock_df, how='left', on='Артикул')
+            report_stock_df['quantity'] = round(report_stock_df['quantity'], 4)
+
 
             report_stock_df['Артикул без замен'] = report_stock_df['Артикул']
 
@@ -1109,7 +1111,7 @@ class MyApp(QWidget):
             else:
                 info_text += 'Все компоненты указаны корректно. \n'
 
-            report_stock_df['total $'] = report_stock_df['quantity'] * report_stock_df['Цена, $']
+            report_stock_df['total $'] = round(report_stock_df['quantity'] * report_stock_df['Цена, $'], 4)
             dollar_price = round(report_stock_df['total $'].loc[(
                     report_stock_df['Статус замены'] == 'Состав по док.') | (
                     report_stock_df['Статус замены'] == 'Нет замены')].sum(), 2)
@@ -1140,6 +1142,7 @@ class MyApp(QWidget):
                 info_text += f'НЕТ ЦЕНЫ для этих компонентов (артикулы): {null_price_list} \n'
 
             report_stock_df.loc[:, 'balance'] = report_stock_df['Склад основной'] - report_stock_df['quantity']
+            report_stock_df['balance'] = round(report_stock_df['balance'], 4)
 
             report_stock_df['Артикул'] = report_stock_df['Артикул'].astype('int32')
 

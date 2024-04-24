@@ -192,15 +192,28 @@ class ReportWindow(QMainWindow):
 
         # self.updatePageButtons()
 
+    def is_digit_check(self, string):
+        if string.isdigit():
+            return int(string)
+        else:
+            try:
+                float(string)
+                return float(string)
+            except ValueError:
+                return string
+
     def getFilteredDataFrame(self):
         sourceModel = self.proxy.sourceModel()
         filtered_data = []
         for row in range(sourceModel.rowCount()):
             if self.proxy.filterAcceptsRow(row, QModelIndex()):
                 row_data = [sourceModel.index(row, col).data(Qt.DisplayRole) for col in range(sourceModel.columnCount())]
+                row_data = [self.is_digit_check(x) for x in row_data]
                 filtered_data.append(row_data)
 
-        return pd.DataFrame(filtered_data, columns=self.model._dataframe.columns)
+        res_df = pd.DataFrame(filtered_data, columns=self.model._dataframe.columns)
+
+        return res_df
 
     def show_dialog(self):
         df_to_save = self.getFilteredDataFrame()

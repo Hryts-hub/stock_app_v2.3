@@ -88,7 +88,7 @@ class PandasModel(QAbstractTableModel):
                 )
             except Exception as e:
                 print(f'ERROR: {type(e)}: {e}')
-        self._dataframe.reset_index(drop=True, inplace=True)
+        # self._dataframe.reset_index(drop=True, inplace=True)
         self.layoutChanged.emit()
 
         print('END----------- sort panda')

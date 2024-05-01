@@ -1,10 +1,7 @@
-# from PyQt5.QtGui import QIcon
-from PyQt5.QtCore import QSortFilterProxyModel, pyqtSlot, QSignalMapper, QPoint, QRegExp, Qt, QAbstractTableModel, \
-    QVariant, QModelIndex, QEvent
-from PyQt5.QtGui import QStandardItemModel, QStandardItem
+from PyQt5.QtCore import pyqtSlot, Qt, QModelIndex, QEvent
 
-from PyQt5.QtWidgets import QMainWindow, QTableWidget, QTableWidgetItem, QAction, QFileDialog, QLabel, QVBoxLayout, \
-    QGridLayout, QMenu, QPushButton, QToolButton, QListWidget, QCheckBox, QHBoxLayout, QDialog
+from PyQt5.QtWidgets import QMainWindow, QAction, QFileDialog, QLabel, \
+    QGridLayout, QPushButton, QToolButton, QDialog
 
 from PyQt5.QtWidgets import QLineEdit, QTableView, QComboBox, QWidget
 import pandas as pd
@@ -43,7 +40,7 @@ class ReportWindow(QMainWindow):
 
         self.gridLayout = QGridLayout(self.centralwidget)
         self.gridLayout.addWidget(self.lineEdit, 1, 1, 1, 1)
-        self.gridLayout.addWidget(self.view, 2, 0, 1, 3)
+        self.gridLayout.addWidget(self.view, 2, 0, 1, 4)
         self.gridLayout.addWidget(self.comboBox, 1, 2, 1, 1)
         self.gridLayout.addWidget(self.label, 1, 0, 1, 1)
 
@@ -65,6 +62,7 @@ class ReportWindow(QMainWindow):
 
         self.comboBox.addItems([col for col in self.model._dataframe.columns])
         self.view.resizeColumnsToContents()
+        # self.view.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
 
         self.lineEdit.textChanged.connect(self.on_lineEdit_textChanged)
         self.comboBox.currentIndexChanged.connect(self.on_comboBox_currentIndexChanged)
@@ -75,34 +73,46 @@ class ReportWindow(QMainWindow):
         self.selected_checkboxes = {}
 
     #  ______________________________________________________________________________________
-    #     # PAGINATION
-    #     self.page_size = 10
-    #
-    #     self.prev_button = QPushButton("Previous")
-    #     self.next_button = QPushButton("Next")
-    #
-    #     self.prev_button.clicked.connect(self.prevPage)
-    #     self.next_button.clicked.connect(self.nextPage)
-    #
-    #     self.gridLayout.addWidget(self.prev_button, 3, 0)
-    #     self.gridLayout.addWidget(self.next_button, 3, 1)
-    #
-    #     self.updatePageButtons()
-    #
-    # def nextPage(self):
-    #     print('nextPage')
-    #     self.proxy.nextPage()
-    #     self.updatePageButtons()
-    #
-    # def prevPage(self):
-    #     print('prevPage')
-    #     self.proxy.previousPage()
-    #     self.updatePageButtons()
-    #
-    # def updatePageButtons(self):
-    #     print('================updatePageButtons')
-    #     self.prev_button.setEnabled(self.proxy.current_page > 0)
-    #     self.next_button.setEnabled(self.proxy.current_page < (len(self.proxy.acceptedRows) // self.page_size))
+        # PAGINATION
+        self.page_size = 10
+
+        self.prev_button = QPushButton("Previous")
+        self.current_page_label = QLabel(self.centralwidget)
+        self.next_button = QPushButton("Next")
+        self.page_count_label = QLabel(self.centralwidget)
+
+        self.prev_button.clicked.connect(self.prevPage)
+        self.next_button.clicked.connect(self.nextPage)
+
+        self.gridLayout.addWidget(self.prev_button, 3, 0)
+        self.gridLayout.addWidget(self.current_page_label, 3, 1)
+        self.gridLayout.addWidget(self.next_button, 3, 2)
+        self.gridLayout.addWidget(self.page_count_label, 3, 3)
+
+        self.current_page_label.setText(f'{self.proxy.current_page + 1}')
+        self.page_count_label.setText(f'{self.proxy.pageCount()}')
+
+        self.updatePageButtons()
+
+    def nextPage(self):
+        print('nextPage')
+        self.proxy.nextPage()
+        self.updatePageButtons()
+
+    def prevPage(self):
+        print('prevPage')
+        self.proxy.previousPage()
+        self.updatePageButtons()
+
+    def updatePageButtons(self):
+        print('================updatePageButtons')
+        self.prev_button.setEnabled(self.proxy.current_page > 0)
+        print('(self.proxy.current_page+1): ', (self.proxy.current_page+1))
+        print('self.proxy.pageCount(): ', self.proxy.pageCount())
+        # self.next_button.setEnabled(self.proxy.current_page < (len(self.proxy.acceptedRows) // self.page_size))
+        self.next_button.setEnabled((self.proxy.current_page+1) < self.proxy.pageCount())
+        self.current_page_label.setText(f'CURRENT PAGE: {self.proxy.current_page + 1}')
+        self.page_count_label.setText(f'TOTAL PAGES: {self.proxy.pageCount()}')
 
 #---------------------------------------------
 
@@ -114,7 +124,10 @@ class ReportWindow(QMainWindow):
                 index = self.view.indexAt(event.pos())
                 print('index.row()', index.row())
                 print('index.column()', index.column())
-                self.on_view_horizontalHeader_sectionClicked(index.column())
+                if index.column() != -1:
+                    self.on_view_horizontalHeader_sectionClicked(index.column())
+                else:
+                    print('TRY AGAIN')
                 print("END-----------Right button clicked")
             if event.button() == Qt.LeftButton:
                 print("-----------Left button clicked")
@@ -135,8 +148,7 @@ class ReportWindow(QMainWindow):
         print('len(self.proxy.acceptedRows): ', len(self.proxy.acceptedRows))
         for row in self.proxy.acceptedRows:
             print('row: ', row)
-            item = sourceModel.index(row, logicalIndex).data(Qt.DisplayRole)
-            value = item
+            value = sourceModel.index(row, logicalIndex).data(Qt.DisplayRole)
             elem = {"value": value, "checked": True}
             if elem not in column_values:
                 column_values.append({"value": value, "checked": True})
@@ -159,7 +171,7 @@ class ReportWindow(QMainWindow):
             print('2 self.selected_checkboxes: ', self.selected_checkboxes)
             print('checked_items: ', checked_items)
 
-            # self.updatePageButtons()
+            self.updatePageButtons()
 
 
     @pyqtSlot(str)
@@ -168,7 +180,7 @@ class ReportWindow(QMainWindow):
 
         self.proxy.setFilter(text, self.proxy.filterKeyColumn())
 
-        # self.updatePageButtons()
+        self.updatePageButtons()
 
 
     @pyqtSlot(int)
@@ -184,13 +196,13 @@ class ReportWindow(QMainWindow):
 
         self.proxy.setFilter('', self.proxy.filterKeyColumn())
         self.proxy.setFilterDict({})
-        # self.proxy.setCurrentPage(0)
         print('self.model.rowCount(): ', self.model.rowCount())
         self.selected_checkboxes = {i: [
             sourceModel.index(row, i).data(Qt.DisplayRole) for row in range(self.model.rowCount())
         ] for i in range(self.model.columnCount())}
+        self.proxy.sort(0, Qt.AscendingOrder)
 
-        # self.updatePageButtons()
+        self.updatePageButtons()
 
     def is_digit_check(self, string):
         if string.isdigit():

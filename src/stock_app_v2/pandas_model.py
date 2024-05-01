@@ -1,6 +1,6 @@
 import pandas as pd
 
-from PyQt5.QtCore import QAbstractTableModel, Qt, QModelIndex, QAbstractItemModel
+from PyQt5.QtCore import QAbstractTableModel, Qt
 
 
 class PandasModel(QAbstractTableModel):
@@ -66,18 +66,11 @@ class PandasModel(QAbstractTableModel):
         self.layoutAboutToBeChanged.emit()
 
         if self._dataframe.dtypes[column] in ('int32', 'float64'):
-            if order == Qt.DescendingOrder:
-                self._dataframe.sort_values(
-                    by=self._dataframe.columns[column],
-                    ascending=False,
-                    inplace=True
-                )
-            else:
-                self._dataframe.sort_values(
-                    by=self._dataframe.columns[column],
-                    ascending=True,
-                    inplace=True
-                )
+            self._dataframe.sort_values(
+                by=self._dataframe.columns[column],
+                ascending=order == Qt.AscendingOrder,
+                inplace=True
+            )
         else:
             try:
                 self._dataframe.sort_values(
@@ -88,7 +81,10 @@ class PandasModel(QAbstractTableModel):
                 )
             except Exception as e:
                 print(f'ERROR: {type(e)}: {e}')
-        # self._dataframe.reset_index(drop=True, inplace=True)
+
+        # reset row number in source df --> user-friendly.
+        self._dataframe.reset_index(drop=True, inplace=True)
+
         self.layoutChanged.emit()
 
         print('END----------- sort panda')

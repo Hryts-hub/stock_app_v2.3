@@ -18,26 +18,26 @@ from stock_app_v2.report_maker_class import ReportMaker
 from stock_app_v2.report_window_class import ReportWindow
 from stock_app_v2.validator_class import Validator
 
-# file with names of products and dicts of moduls
+
+FILE_STOCK = 'Склад 14.01.16.xlsx'
+
+# .csv - file with names of products and dicts of moduls
+
+# prod
 FILE_OF_PRODUCTS = 'data.csv'
-# FILE_OF_PRODUCTS = 'data_3_col.csv'
-# PATH_TO_FILE_OF_PRODUCTS = 'D:/OEMTECH/Projects/FILE_STOCK_FOLDER/'  # {FILE_OF_PRODUCTS}'
 PATH_TO_FILE_OF_PRODUCTS = 'Z:/Склад/'
+PATH_TO_FILE_STOCK = 'Z:/Склад/'
+
+# dev
+# FILE_OF_PRODUCTS = 'data_3_col.csv'
+# PATH_TO_FILE_OF_PRODUCTS = 'D:/OEMTECH/Projects/FILE_STOCK_FOLDER/'
+# PATH_TO_FILE_STOCK = 'D:/OEMTECH/Projects/FILE_STOCK_FOLDER/stock_versions/stock_5026/'
 
 # columns in this file = columns in data frame
 COLUMN_PRODUCT_NAMES = 'наименование блока'
 COLUMN_DICT_OF_MODULS = 'словарь модулей'
 # !!!
 COLUMN_DICT_OF_COMPONENTS = 'словарь эл.компонентов'
-
-FILE_STOCK = 'Склад 14.01.16.xlsx'
-# FILE_STOCK = 'Z:/Склад/Склад 14.01.16.xlsx'
-# D:\OEMTECH\Projects\FILE_STOCK_FOLDER\stock_versions\stock_5026
-# PATH_TO_FILE_STOCK = 'D:/OEMTECH/Projects/FILE_STOCK_FOLDER/stock_versions/stock_5026/'
-PATH_TO_FILE_STOCK = 'Z:/Склад/'
-
-
-# FILE_OF_SP_PLAT # Склад 14.01.16
 
 
 class MyApp(QWidget):
@@ -684,6 +684,7 @@ class MyApp(QWidget):
                 report_df = ReportMaker(big_bom_df).make_report_2(col_moduls_dict)
 
                 report_df.rename(columns={'Unnamed: 3': 'Подвид', 'Unnamed: 4': 'Название'}, inplace=True)
+                report_df = report_df.astype({'Артикул': int})
 
                 return report_df
 
@@ -809,21 +810,15 @@ class MyApp(QWidget):
         self.stock_df, self.msg, self.color = DataReader(
             PATH_TO_FILE_STOCK, FILE_STOCK).read_data_from_stock_file(sheet_name, cols)
 
-        # self.stock_df = self.stock_df.iloc[12:]
-
         self.stock_df = self.stock_df.dropna(subset=['Артикул'])
 
         self.stock_df = self.stock_df.astype({'Артикул': int})
-        # self.stock_df = self.stock_df.astype({'Артикул осн.': int}) nan is float ((
 
         self.stock_df[['Склад основной', 'Цена, $']] = self.stock_df[['Склад основной', 'Цена, $']].fillna(0)
 
         for val in self.stock_df['Склад основной'].values:
             self.stock_df.loc[self.stock_df['Склад основной'] == val, 'Склад основной'] = 0 if (
-                not str(val).replace('.', '').isdigit()) else val  # ',' --> '.'    BUG FIXED
-            # if type(val) != int:
-            #     print(val)
-            #     print(type(val))
+                not str(val).replace('.', '').isdigit()) else val
 
         for val in self.stock_df['Цена, $'].values:
             self.stock_df.loc[self.stock_df['Цена, $'] == val, 'Цена, $'] = 0 if (
@@ -844,10 +839,8 @@ class MyApp(QWidget):
         self.stock_df['Статус замены'].loc[self.stock_df['Артикул осн.'].isnull()] = 'Нет замены'
 
         # *------------
-        # print(len(self.stock_df))
         offset = 2
         cell_names_dict = {'I1': ['I' + str(x) for x in range(offset, len(self.stock_df)+1)]}
-        # print(cell_names_dict['I1'][-1])
 
         comment_dict = DataReader(
             PATH_TO_FILE_STOCK, FILE_STOCK).read_comments_from_stock_file_by_openpyxl(
@@ -856,61 +849,25 @@ class MyApp(QWidget):
         res_data = {'comments': comment_dict['Склад основной']}
 
         df = pd.DataFrame(res_data)
-        # df.index += offset
-        # print(len(df))
-        # print(len(comment_dict['Склад основной']))
-        # print(comment_dict['Склад основной'])
-        # print(comment_dict.keys())
 
         self.stock_df['comments'] = df[['comments']]
-        # print(self.stock_df.columns)
-        # print(self.stock_df.tail(3))
         self.stock_df['comments'] = self.stock_df['comments'].fillna('')
         k = 0  # index of the row
         for i in self.stock_df[:]['comments']:
-            # print(k, i)
             i = i.split('\n')
-            # self.stock_df['comments'].values[k] = i
-            # if k < 13:
-            #     print(k, i)
-            # k += 1
 
-        # self.stock_df['comments_1'] = self.stock_df['comments']
-        # k = 0
-        # for i in self.stock_df['comments'].values:
-            if i != []:
-                # print(k,'=======')
-                # if k < 13:
-                #     print(k, i)
-
+            if i:
                 s = [[x for x in aa.split(' ') if x != ''] for aa in i if aa != '']
-                # if k < 13:
-                #     print(s)
                 ss = []
                 for x in s:
                     if len(x) > 1 and x[0][-1].isdigit() and x[1][0].isalpha():
-                        # elem = (x[0][-8:] + x[1][:2].upper()) if x[1][:2].upper() not in ['НА', 'МИ', 'КО', 'АЛ', 'БЕ',
-                        #                                                                   'ВЕ', 'СВ'] else (
-                        #             x[0][-8:] + x[1][:4].upper())
                         elem = x[0][-8:]
                         ss.append(elem)
-                # if k < 13:
-                #     print(ss)
-
-                # self.stock_df['comments'].values[k] = ss
                 z = [x.replace('/', '.') for x in ss]
                 z = [x.replace('-', '0') for x in z]
                 z = [x[:6] + '20' + x[6:8] for x in z]
-                # if k < 13:
-                #     print(k, z)
                 if z:
-                    # if k < 13:
-                    #     print(k, z[-1])
-                    # dt = datetime.strptime(z[-1], "%d.%m.%y")
-                    # if k < 13:
-                    #     print(k, z[-1], dt)
                     self.stock_df['comments'].values[k] = z[-1]
-                    # self.stock_df['comments'].values[k] = dt
                 else:
                     self.stock_df['comments'].values[k] = ''
 
@@ -1145,6 +1102,7 @@ class MyApp(QWidget):
             report_stock_df['balance'] = round(report_stock_df['balance'], 4)
 
             report_stock_df['Артикул'] = report_stock_df['Артикул'].astype('int32')
+            report_stock_df['Артикул без замен'] = report_stock_df['Артикул без замен'].astype('int32')
 
             if not euro_price:
                 report_stock_df = report_stock_df.drop(['Цена, EURO', 'total EURO'], axis=1)

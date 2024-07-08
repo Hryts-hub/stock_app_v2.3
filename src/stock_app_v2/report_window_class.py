@@ -209,7 +209,10 @@ class ReportWindow(QMainWindow):
 
     def reset_date_filter(self):
         self.proxy.set_flag_acceptedRows(False)
-        self.date_cols_dict.pop(self.logicalIndex)
+        try:
+            self.date_cols_dict.pop(self.logicalIndex)
+        except Exception as e:
+            print(f'ERROR: {type(e)}: {e}')
         self.proxy.set_filter_date_columns(self.date_cols_dict)
         self.updatePageButtons()
     #---------------+

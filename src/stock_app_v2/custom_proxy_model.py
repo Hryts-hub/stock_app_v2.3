@@ -1,4 +1,4 @@
-from PyQt5.QtCore import QSortFilterProxyModel, QModelIndex, QRegExp, Qt
+from PyQt5.QtCore import QSortFilterProxyModel, QModelIndex, QRegExp, Qt, QDate, QDateTime
 
 from stock_app_v2.pandas_model import PandasModel
 
@@ -9,11 +9,20 @@ class CustomProxyModel(QSortFilterProxyModel):
         super().__init__(parent)
         self.filterDict = {}
         self.acceptedRows = set()
+        #-----------
+        self.flag_acceptedRows = False
+        self.flag_filter_changed = False
+        # self.minDate = QDate()
+        # self.maxDate = QDate()
+        self.col_idx_list = []
+        self.col_idx_dict = dict()
+        # self.date_column_type = "Date_type"
+        #-----------+
         # self.acceptedRows = []
 
         self._filters = dict()
 # ----------------------------------------------------------------------- PAGINATION
-        self.page_size = 10  # Number of rows per page
+        self.page_size = 30  # Number of rows per page
         self.current_page = 0  # Current page index
 
     def setPageSize(self, page_size):
@@ -96,17 +105,53 @@ class CustomProxyModel(QSortFilterProxyModel):
         # if sourceIndex.row() in self.acceptedRows:
         #     print('sourceIndex.row(): ', sourceIndex.row())
         #     print('list(self.acceptedRows).index(sourceIndex.row()): ', list(self.acceptedRows).index(sourceIndex.row()))
-            proxy_row = list(self.acceptedRows).index(sourceIndex.row()) - self.current_page * self.page_size
-            # print('proxy_row: ', proxy_row)
-            proxy_col = sourceIndex.column()  # No changes needed for column
-            proxy_row_idx = self.createIndex(proxy_row, proxy_col)
 
-            # print('proxy_row_idx: ', proxy_row_idx)
-            return proxy_row_idx
+         #########
+            # proxy_row = list(self.acceptedRows).index(sourceIndex.row()) - self.current_page * self.page_size
+            # # print('proxy_row: ', proxy_row)
+            # proxy_col = sourceIndex.column()  # No changes needed for column
+            # proxy_row_idx = self.createIndex(proxy_row, proxy_col)
+            #
+            # # print('proxy_row_idx: ', proxy_row_idx)
+            # return proxy_row_idx
         else:
             return QModelIndex()
 
 # -------------------------------------------------------------------------------
+
+    def dateInRange(self, date, minDate, maxDate):
+        print(f'dateInRange, date: {date}')
+        if date:
+            # date = QDate.fromString(date, "yyyy-MM-dd")
+            print(f'minDate: {minDate}')
+            date_time = QDateTime.fromString(date, "yyyy-MM-dd HH:mm:ss")
+            print(date_time)
+            date = date_time.date()
+            print(date)
+
+            return ((not minDate.isValid() or date >= minDate)
+                    and (not maxDate.isValid() or date <= maxDate))
+        else:
+            return False
+
+
+    def set_filter_date_columns(self, col_idx_dict):
+        print('START set_filter_date_columns')
+        self.col_idx_dict = col_idx_dict
+        self.col_idx_list = list(col_idx_dict.keys())
+        self.flag_filter_changed = True
+        self.setCurrentPage(0)
+        self.invalidateFilter()
+        print('END set_filter_date_columns')
+
+    def filter_date_columns(self):
+        return self.col_idx_list
+
+    def set_flag_acceptedRows(self, flag):
+        self.flag_acceptedRows = flag
+        # self.setCurrentPage(0)
+        self.invalidateFilter()
+    #-------------+
 
     @property
     def filters(self):
@@ -119,6 +164,7 @@ class CustomProxyModel(QSortFilterProxyModel):
         elif column in self.filters:
             del self.filters[column]
         print('1filt:', self.filters)
+        self.flag_filter_changed = True
         self.setCurrentPage(0)  # pagination
         self.invalidateFilter()
         # self.invalidate()
@@ -128,6 +174,7 @@ class CustomProxyModel(QSortFilterProxyModel):
     def setFilterDict(self, filterDict):
         print('--------------setFilterDict:', filterDict)
         self.filterDict = filterDict
+        self.flag_filter_changed = True
         self.setCurrentPage(0)  # pagination
         self.invalidateFilter()
         # self.invalidate()
@@ -136,6 +183,31 @@ class CustomProxyModel(QSortFilterProxyModel):
 
     def filterAcceptsRow(self, sourceRow, sourceParent):
         # print('++++++++++++++filterAcceptsRow')
+        #-------------
+        if self.flag_acceptedRows:
+            if sourceRow in self.acceptedRows:
+                return True
+            else:
+                return False
+
+        if self.col_idx_list:
+            # print(f'self.col_idx_list: {self.col_idx_list}')
+            for column in self.col_idx_list:
+                index2 = self.sourceModel().index(sourceRow, column, sourceParent)
+                # print(f'self.sourceModel().data(index2): {self.sourceModel().data(index2)}')
+                flag = self.dateInRange(
+                    self.sourceModel().data(index2),
+                    self.col_idx_dict[column][0],
+                    self.col_idx_dict[column][1]
+                )
+                if flag:
+                    self.acceptedRows.add(sourceRow)
+                else:
+                    self.acceptedRows.discard(sourceRow)
+                    return False
+
+        #-------------+
+
         if self.filters:
             for column, expresion in self.filters.items():
                 # print('-----column, expresion: ', column, expresion)
@@ -191,19 +263,30 @@ class CustomProxyModel(QSortFilterProxyModel):
         print('--------------sort proxy')
         print('column: ', column)
         print('sort: ', order)
-
+        self.flag_filter_changed = False
+        self.flag_acceptedRows = False
         source_model = self.sourceModel()
 
         if isinstance(source_model, PandasModel):
             # source_column = column
             source_column = self.mapToSource(self.index(0, column)).column()
+
+            # old = self.acceptedRows
             self.acceptedRows = set([i for i in range(source_model.rowCount())])
-            # self.acceptedRows = [i for i in range(source_model.rowCount())]
+            # self.set_flag_acceptedRows(True)
             source_model.sort(source_column, order)
+            # self.set_flag_acceptedRows(False)
+            # if self.flag_filter_changed:
+            #     self.acceptedRows = old
+            #     self.set_flag_acceptedRows(True)
             print('source_model.sort(source_column, order): ')
+            # self.set_flag_acceptedRows(False)
+            # self.set_flag_acceptedRows(True)
 
         else:
             print('isinstance_super')
             super().sort(column, order)
+        # self.flag_filter_changed = False
+        # self.flag_acceptedRows = False
         print('END--------------sort proxy')
 

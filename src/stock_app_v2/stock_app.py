@@ -17,6 +17,7 @@ from stock_app_v2.dict_macker_class import DictMaker
 from stock_app_v2.report_maker_class import ReportMaker
 from stock_app_v2.report_window_class import ReportWindow
 from stock_app_v2.validator_class import Validator
+from stock_app_v2.func_library_class import FuncLibrary
 
 
 FILE_STOCK = 'Склад 14.01.16.xlsx'
@@ -31,7 +32,7 @@ PATH_TO_FILE_STOCK = 'Z:/Склад/'
 # dev
 # FILE_OF_PRODUCTS = 'data_3_col.csv'
 # PATH_TO_FILE_OF_PRODUCTS = 'D:/OEMTECH/Projects/FILE_STOCK_FOLDER/'
-# PATH_TO_FILE_STOCK = 'D:/OEMTECH/Projects/FILE_STOCK_FOLDER/stock_versions/stock_5026/'
+# PATH_TO_FILE_STOCK = 'D:/OEMTECH/Projects/FILE_STOCK_FOLDER/stock_versions/stock_5044/'
 
 # columns in this file = columns in data frame
 COLUMN_PRODUCT_NAMES = 'наименование блока'
@@ -103,12 +104,15 @@ class MyApp(QWidget):
 
         # BOM - Bill Of Materials
 
-        # Check               BOM                 Price
+        # Check               BOM                 Price     Stock Output
         # modules
         # existence
         # rep_0 --> rep_1 --> rep_2 -->           rep_7
         # rep_0 -->           rep_3 -->           rep_5
         # rep_0 -->           rep_3 --> rep_4 --> rep_6
+        #                                                   rep_8 stock
+        #                                                   rep_9 stock_dev
+        #                                                   rep_10 stock+stock_dev
 
         self.report_0_name = 'Report_0 существующие модули'
         self.report_1_name = 'Report_1 недостающие модули в блоках'
@@ -118,6 +122,8 @@ class MyApp(QWidget):
         self.report_5_name = 'Report_5 BOM по всем компонентам + цены'
         self.report_6_name = 'Report_6 недостающие компоненты из BOM + цены'
         self.report_7_name = 'Report_7 недостающие компоненты недостающих модулей + цены'
+        self.report_8_name = 'Report_8 Склад основной с датами последних поступлений'
+        self.report_9_name = 'Report_9 Склад разработки (компоненты). Все столбцы с датами'
 
         self.checkBox_report_0 = QCheckBox(self.report_0_name)
         self.checkBox_report_1 = QCheckBox(self.report_1_name)
@@ -127,6 +133,12 @@ class MyApp(QWidget):
         self.checkBox_report_5 = QCheckBox(self.report_5_name)
         self.checkBox_report_6 = QCheckBox(self.report_6_name)
         self.checkBox_report_7 = QCheckBox(self.report_7_name)
+        self.checkBox_report_8 = QCheckBox(self.report_8_name)
+        self.checkBox_report_9 = QCheckBox(self.report_9_name)
+
+        self.checkBox_report_5.setStyleSheet("color: green")
+        self.checkBox_report_8.setStyleSheet("color: darkgreen")
+        self.checkBox_report_9.setStyleSheet("color: darkgreen")
 
         self.func_dict = {}  # {key=self.checkBox_report_N: val=ReportMaker(DF).make_report_N}
 
@@ -138,11 +150,21 @@ class MyApp(QWidget):
                                  self.checkBox_report_5: self.report_5_name,
                                  self.checkBox_report_6: self.report_6_name,
                                  self.checkBox_report_7: self.report_7_name,
+                                 self.checkBox_report_8: self.report_8_name,
+                                 self.checkBox_report_9: self.report_9_name,
                                  }
 
         self.checkBox_group = QButtonGroup()
 
         self.reportButton = QPushButton("Получить отчет")
+        #
+        self.reportButton.setStyleSheet('background: rgb(0,255,0);')  # green
+
+        self.stockButton = QPushButton("Склад + разраб.")
+        self.stockButton.setStyleSheet('background: rgb(255,255,0);')  # yellow
+
+        self.stock_modButton = QPushButton("Склад модулей(узлов)")
+        self.stock_modButton.setStyleSheet('background: rgb(255,255,200);')  # light yellow
 
         self.progress_bar = QProgressBar(self)
 
@@ -167,8 +189,9 @@ class MyApp(QWidget):
         self.old_dict_for_report = defaultdict(dict)
         self.cache_reports_dict = defaultdict(dict)
 
-        self.modul_df = None  # from stock file -- sheet_name = 'Склад модулей(узлов)'  -- cols = 'C,F,G'
-        self.stock_df = None  # from stock file -- sheet_name = 'СП_плат'               -- cols calculated
+        self.modul_df = None  # from stock file -- sheet_name = 'Склад модулей(узлов)', cols = 'C,F,G'
+        self.stock_df = None  # from stock file -- sheet_name = 'Склад', cols = 'C, D, E, G, I, K, L, M, N, O, Q'
+        self.stock_dev_df = None  # from stock file -- sheet_name = 'Скл.Р(компоненты)', all columns
 
         self.initUI()
 
@@ -221,10 +244,15 @@ class MyApp(QWidget):
         self.checkBox_group.addButton(self.checkBox_report_5)
         self.checkBox_group.addButton(self.checkBox_report_6)
         self.checkBox_group.addButton(self.checkBox_report_7)
+        self.checkBox_group.addButton(self.checkBox_report_8)
+        self.checkBox_group.addButton(self.checkBox_report_9)
 
         # GET_REPORT BUTTON --> opens ReportWindow with report table (can be saved in excel file)
         # and shows report text in self.report_info_label
         self.reportButton.clicked.connect(self.get_report)
+        #
+        self.stockButton.clicked.connect(self.get_stock)
+        self.stock_modButton.clicked.connect(self.get_stock_mod)
 
         self.report_info_label.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
 
@@ -255,6 +283,20 @@ class MyApp(QWidget):
         hbox_list.addWidget(self.label_list)
         hbox_list.addWidget(self.comboBox_list)
 
+        #
+        hbox_buttons = QHBoxLayout()
+        hbox_buttons.addWidget(self.reportButton)
+        hbox_buttons.addWidget(self.stockButton)
+        hbox_buttons.addWidget(self.stock_modButton)
+
+        # hbox_report_0_8 = QHBoxLayout()
+        # hbox_report_0_8.addWidget(self.checkBox_report_0)
+        # hbox_report_0_8.addWidget(self.checkBox_report_8)
+        #
+        # hbox_report_1_9 = QHBoxLayout()
+        # hbox_report_1_9.addWidget(self.checkBox_report_1)
+        # hbox_report_1_9.addWidget(self.checkBox_report_9)
+
         vbox = QVBoxLayout()
         vbox.addWidget(self.info_label)  # widget with selected data_name
         vbox.addLayout(hbox)
@@ -267,16 +309,39 @@ class MyApp(QWidget):
         vbox.addLayout(hbox_list)  # widget with list selected data_names (blocks)
         vbox.addWidget(self.removeButton)
 
-        vbox.addWidget(self.checkBox_report_0)
-        vbox.addWidget(self.checkBox_report_1)
-        vbox.addWidget(self.checkBox_report_2)
-        vbox.addWidget(self.checkBox_report_3)
-        vbox.addWidget(self.checkBox_report_4)
-        vbox.addWidget(self.checkBox_report_5)
-        vbox.addWidget(self.checkBox_report_6)
-        vbox.addWidget(self.checkBox_report_7)
+        # # vbox.addWidget(self.checkBox_report_0)
+        # vbox.addLayout(hbox_report_0_8)
+        # # vbox.addWidget(self.checkBox_report_1)
+        # vbox.addLayout(hbox_report_1_9)
+        # vbox.addWidget(self.checkBox_report_2)
+        # vbox.addWidget(self.checkBox_report_3)
+        # vbox.addWidget(self.checkBox_report_4)
+        # vbox.addWidget(self.checkBox_report_5)
+        # vbox.addWidget(self.checkBox_report_6)
+        # vbox.addWidget(self.checkBox_report_7)
 
-        vbox.addWidget(self.reportButton)
+        v1_box = QVBoxLayout()
+        v1_box.addWidget(self.checkBox_report_0)
+        v1_box.addWidget(self.checkBox_report_1)
+        v1_box.addWidget(self.checkBox_report_2)
+        v1_box.addWidget(self.checkBox_report_3)
+        v1_box.addWidget(self.checkBox_report_4)
+        v1_box.addWidget(self.checkBox_report_5)
+        v1_box.addWidget(self.checkBox_report_6)
+        v1_box.addWidget(self.checkBox_report_7)
+
+        v2_box = QVBoxLayout()
+        v2_box.addWidget(self.checkBox_report_8)
+        v2_box.addWidget(self.checkBox_report_9)
+
+        hbox_reports = QHBoxLayout()
+        hbox_reports.addLayout(v1_box)
+        hbox_reports.addLayout(v2_box)
+
+        vbox.addLayout(hbox_reports)
+
+        # vbox.addWidget(self.reportButton)
+        vbox.addLayout(hbox_buttons)
 
         vbox.addWidget(self.progress_bar)
 
@@ -553,7 +618,10 @@ class MyApp(QWidget):
         cols = 'C,F,G, H'  # col H added
         self.modul_df, self.msg, self.color = DataReader(
             PATH_TO_FILE_STOCK, FILE_STOCK).read_data_from_stock_file(sheet_name, cols)
-        self.modul_df = self.modul_df.iloc[2:]
+
+        if self.modul_df is not None and not self.modul_df.empty:
+            self.modul_df = self.modul_df.iloc[2:]
+
         self.progress_bar.setValue(10)
         self._set_info_label()
 
@@ -578,6 +646,8 @@ class MyApp(QWidget):
         Result: DF with balance existing moduls (art of modul -- q-ty) and text with info messages
         :return: None
         """
+        if self.modul_df is None:
+            self.read_modul_from_stock_file()
 
         dict_for_report = self.make_dict_for_report()
 
@@ -642,7 +712,6 @@ class MyApp(QWidget):
         (dict from self.modul_df).
         :param report_df:
         :param info_text:
-        :param report_dict:
         :return: report_df -> DF
         """
 
@@ -661,32 +730,38 @@ class MyApp(QWidget):
             big_bom_df, self.msg, self.color = DataReader(
                 PATH_TO_FILE_STOCK, FILE_STOCK).read_data_from_stock_file(sheet_name, cols)
 
-            big_bom_df = big_bom_df.iloc[14:]
-            big_bom_df.rename(columns={'Спецификация плат': 'Unnamed: 4'}, inplace=True)
-            for col in range(8, big_bom_df.shape[1]):
-                if big_bom_df.iloc[:, col].sum() == 0:
-                    self.msg += f' {int(big_bom_df.iloc[:, [col]].columns[0].split(":")[-1]) - 9} '
+            if not big_bom_df.empty:
 
-            if self.color == 'red':
-                self._set_info_label()
-                self.report_info_label_text = info_text
-                return None
-            else:
-                if self.msg:
-                    info_text += f'НЕТ СОСТАВА (артикулы модулей): {self.msg}\n'
+                big_bom_df = big_bom_df.iloc[14:]
+                big_bom_df.rename(columns={'Спецификация плат': 'Unnamed: 4'}, inplace=True)
 
-                self.report_info_label.setStyleSheet(f'color:{self.color};')
-                self.report_info_label_text = info_text
-                self.report_info_label.setText(info_text)
+                for col in range(8, big_bom_df.shape[1]):
+                    if big_bom_df.iloc[:, col].sum() == 0:
+                        self.msg += f' {int(big_bom_df.iloc[:, [col]].columns[0].split(":")[-1]) - 9} '
 
-                self.progress_bar.setValue(70)
+                if self.color == 'red':
+                    self._set_info_label()
+                    self.report_info_label_text = info_text
+                    return None
+                else:
+                    if self.msg:
+                        info_text += f'НЕТ СОСТАВА (артикулы модулей): {self.msg}\n'
 
-                report_df = ReportMaker(big_bom_df).make_report_2(col_moduls_dict)
+                    self.report_info_label.setStyleSheet(f'color:{self.color};')
+                    self.report_info_label_text = info_text
+                    self.report_info_label.setText(info_text)
 
-                report_df.rename(columns={'Unnamed: 3': 'Подвид', 'Unnamed: 4': 'Название'}, inplace=True)
-                report_df = report_df.astype({'Артикул': int})
+                    self.progress_bar.setValue(70)
+
+                    report_df = ReportMaker(big_bom_df).make_report_2(col_moduls_dict)
+
+                    report_df.rename(columns={'Unnamed: 3': 'Подвид', 'Unnamed: 4': 'Название'}, inplace=True)
+                    report_df = report_df.astype({'Артикул': int})
 
                 return report_df
+            else:
+                # !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+                print('else')
 
     def compose_report_2(self):
         """
@@ -805,80 +880,17 @@ class MyApp(QWidget):
         :return: None
         """
         print('prepare_stock_df')
+        self.progress_bar.setValue(20)
         cols = 'C, D, E, G, I, K, L, M, N, O, Q'  # added E, L, M, N, O +Q
         sheet_name = 'Склад'
         self.stock_df, self.msg, self.color = DataReader(
             PATH_TO_FILE_STOCK, FILE_STOCK).read_data_from_stock_file(sheet_name, cols)
 
-        self.stock_df = self.stock_df.dropna(subset=['Артикул'])
+        self.progress_bar.setValue(50)
 
-        self.stock_df = self.stock_df.astype({'Артикул': int})
-
-        self.stock_df[['Склад основной', 'Цена, $']] = self.stock_df[['Склад основной', 'Цена, $']].fillna(0)
-
-        for val in self.stock_df['Склад основной'].values:
-            self.stock_df.loc[self.stock_df['Склад основной'] == val, 'Склад основной'] = 0 if (
-                not str(val).replace('.', '').isdigit()) else val
-
-        for val in self.stock_df['Цена, $'].values:
-            self.stock_df.loc[self.stock_df['Цена, $'] == val, 'Цена, $'] = 0 if (
-                    str(val).isspace() or str(val) == '') else val
-
-        self.stock_df['Цена, EURO'] = 0  # None
-
-        for val in self.stock_df['Цена, $'].values:
-            if str(val).lower().find('e') != -1 or str(val).lower().find('е') != -1:
-                self.stock_df.loc[self.stock_df['Цена, $'] == val, 'Цена, $'] = 0
-                self.stock_df.loc[self.stock_df['Цена, $'] == val, 'Цена, EURO'] = str(val).replace(',', '.').strip()[:-1]
-
-        self.stock_df[['Склад основной', 'Цена, $', 'Цена, EURO']] = self.stock_df[[
-            'Склад основной', 'Цена, $', 'Цена, EURO']].astype(float)
-
-        self.stock_df['Статус замены'] = ''
-        self.stock_df['Статус замены'].loc[self.stock_df['Артикул осн.'].notnull()] = 'Состав по док.'
-        self.stock_df['Статус замены'].loc[self.stock_df['Артикул осн.'].isnull()] = 'Нет замены'
-
-        # *------------
-        offset = 2
-        cell_names_dict = {'I1': ['I' + str(x) for x in range(offset, len(self.stock_df)+1)]}
-
-        comment_dict = DataReader(
-            PATH_TO_FILE_STOCK, FILE_STOCK).read_comments_from_stock_file_by_openpyxl(
-            sheet_name, cell_names_dict)
-
-        res_data = {'comments': comment_dict['Склад основной']}
-
-        df = pd.DataFrame(res_data)
-
-        self.stock_df['comments'] = df[['comments']]
-        self.stock_df['comments'] = self.stock_df['comments'].fillna('')
-        k = 0  # index of the row
-        for i in self.stock_df[:]['comments']:
-            i = i.split('\n')
-
-            if i:
-                s = [[x for x in aa.split(' ') if x != ''] for aa in i if aa != '']
-                ss = []
-                for x in s:
-                    if len(x) > 1 and x[0][-1].isdigit() and x[1][0].isalpha():
-                        elem = x[0][-8:]
-                        ss.append(elem)
-                z = [x.replace('/', '.') for x in ss]
-                z = [x.replace('-', '0') for x in z]
-                z = [x[:6] + '20' + x[6:8] for x in z]
-                if z:
-                    self.stock_df['comments'].values[k] = z[-1]
-                else:
-                    self.stock_df['comments'].values[k] = ''
-
-            else:
-                self.stock_df['comments'].values[k] = ''
-
-            k += 1
-
-        self.stock_df['date'] = pd.to_datetime(self.stock_df['comments'], format='%d.%m.%Y', errors='coerce')
+        self.stock_df = ReportMaker(self.stock_df).prepare_stock_df(sheet_name, PATH_TO_FILE_STOCK, FILE_STOCK)
+        self.progress_bar.setValue(70)
         print('END prepare_stock_df')
-
 
     def prepare_block_report_df(self, components_from_modules_df):
         """
@@ -944,168 +956,7 @@ class MyApp(QWidget):
             if self.stock_df is None:
                 self.prepare_stock_df()
 
-            report_stock_df = res_compo_df.merge(self.stock_df, how='left', on='Артикул')
-            report_stock_df['quantity'] = round(report_stock_df['quantity'], 4)
-
-
-            report_stock_df['Артикул без замен'] = report_stock_df['Артикул']
-
-            doc_report_stock_df = report_stock_df.loc[report_stock_df['Статус замены'] == 'Состав по док.']
-
-            # --------------------
-
-            main_res_report_stock_df = report_stock_df[['Артикул', 'quantity']].loc[
-                report_stock_df['Статус замены'] == 'Состав по док.']
-
-            main_res_report_stock_df['Артикул'] = (
-                report_stock_df['Артикул осн.'].loc[
-                    report_stock_df['Статус замены'] == 'Состав по док.'].astype('int32')
-            )
-
-            main_res_report_stock_df = main_res_report_stock_df[['Артикул', 'quantity']]
-
-            main_replace_df = main_res_report_stock_df.merge(self.stock_df, how='left', on='Артикул')
-
-            main_replace_df['Артикул без замен'] = main_replace_df['Артикул']
-
-            main_replace_df['Артикул'] = main_replace_df['Артикул осн.']
-            main_report_stock_df = main_replace_df.sort_values('Артикул')
-            main_report_stock_df['Статус замены'] = 'Состав по артикулу "осн."'
-
-            #--------------------
-            main_stock_df = self.stock_df.copy(deep=True)
-            main_stock_df['Артикул без замен'] = main_stock_df['Артикул']
-            main_stock_df['Артикул'].loc[main_stock_df['Артикул осн.'].notnull()] = (
-                main_stock_df['Артикул осн.'].loc[main_stock_df['Артикул осн.'].notnull()].astype('int32')
-            )
-
-            max_report_stock_df = main_report_stock_df[[
-                'Артикул', 'quantity']].merge(main_stock_df, how='left', on='Артикул')
-            # print('max_report_stock_df')
-            # print(max_report_stock_df)
-
-            max_group_df = max_report_stock_df.groupby('Артикул осн.').agg({'Цена, $': ['max']})  #
-            # print(max_group_df)
-            min_group_df = max_report_stock_df.groupby('Артикул осн.').agg({'Цена, $': ['min']})  #
-            # print(min_group_df)
-
-            max_group_df.columns = max_group_df.columns.map('_'.join)
-            min_group_df.columns = min_group_df.columns.map('_'.join)
-            # print(max_group_df)
-
-            max_group_df = max_group_df.rename_axis(None, axis=1)  # ?
-            min_group_df = min_group_df.rename_axis(None, axis=1)  # ?
-            max_p_report_stock_df = max_report_stock_df.merge(
-                max_group_df, how='left', on='Артикул осн.')
-            # print('max')
-
-            max_p_report_stock_df = max_p_report_stock_df.loc[
-                max_p_report_stock_df['Цена, $'] == max_p_report_stock_df['Цена, $_max']]
-            max_p_report_stock_df['Статус замены'] = 'Состав, МАХ цена'
-            max_p_report_stock_df = max_p_report_stock_df.drop(columns=['Цена, $_max'])
-            max_p_report_stock_df['Артикул'] = max_p_report_stock_df['Артикул без замен']
-            # print(max_p_report_stock_df)
-
-
-            min_pm_report_stock_df = max_report_stock_df.merge(
-                min_group_df, how='left', on='Артикул осн.')
-            # print('min')
-
-            min_pm_report_stock_df = min_pm_report_stock_df.loc[
-                min_pm_report_stock_df['Цена, $'] == min_pm_report_stock_df['Цена, $_min']]
-            min_pm_report_stock_df['Статус замены'] = 'Состав, MIN цена'
-            min_pm_report_stock_df = min_pm_report_stock_df.drop(columns=['Цена, $_min'])
-
-            min_pm_report_stock_df['Артикул'] = min_pm_report_stock_df['Артикул без замен']
-            # print(min_pm_report_stock_df)
-
-            # --------------------
-            max_dt_group_df = max_report_stock_df.groupby('Артикул осн.').agg({'date': ['max']})
-
-            max_dt_group_df.columns = max_dt_group_df.columns.map('_'.join)
-
-            max_dt_group_df = max_dt_group_df.rename_axis(None, axis=1)
-
-            max_dt_report_stock_df = max_report_stock_df.merge(max_dt_group_df, how='left', on='Артикул осн.')
-
-            max_dt_report_stock_df = max_dt_report_stock_df.loc[
-                max_dt_report_stock_df['date'] == max_dt_report_stock_df['date_max']]
-            gr = max_dt_report_stock_df.groupby(['Артикул']).size().reset_index(name='counts')
-            gr_dupl = gr.loc[gr['counts'] > 1]
-            # print('------------')
-            date_dupl_df = max_dt_report_stock_df.loc[max_dt_report_stock_df['Артикул'].isin(gr_dupl['Артикул'])]
-            # print(date_dupl_df)
-            date_dedupl_df = date_dupl_df.loc[date_dupl_df['Артикул'] == date_dupl_df['Артикул без замен']]
-            # print(date_dedupl_df)
-            date_not_dupl_df = max_dt_report_stock_df.loc[~max_dt_report_stock_df['Артикул'].isin(gr_dupl['Артикул'])]
-            # print(date_not_dupl_df)
-            max_dt_report_stock_df = pd.concat([
-                date_not_dupl_df,
-                date_dedupl_df,
-            ], ignore_index=True)
-
-            max_dt_report_stock_df['Статус замены'] = 'Состав, ДАТА'
-            max_dt_report_stock_df = max_dt_report_stock_df.drop(columns=['date_max'])
-            max_dt_report_stock_df['Артикул'] = max_dt_report_stock_df['Артикул без замен']
-            # --------------------
-
-            report_stock_df = pd.concat([
-                report_stock_df,
-                main_report_stock_df,
-                max_p_report_stock_df,
-                min_pm_report_stock_df,
-                max_dt_report_stock_df,
-            ], ignore_index=True)
-            # --------------------
-
-            not_found_df = report_stock_df[report_stock_df['Название\n(Комплектующие склада)'].isnull()]
-            not_found_dict = DictMaker().make_dict_from_df(not_found_df, 'Артикул', 'quantity')
-
-            not_found = list(not_found_dict.keys())
-
-            if not_found:
-                info_text += f'НЕТ ИНФОРМАЦИИ по артикулам этих компонентов: {not_found} \n'
-            else:
-                info_text += 'Все компоненты указаны корректно. \n'
-
-            report_stock_df['total $'] = round(report_stock_df['quantity'] * report_stock_df['Цена, $'], 4)
-            dollar_price = round(report_stock_df['total $'].loc[(
-                    report_stock_df['Статус замены'] == 'Состав по док.') | (
-                    report_stock_df['Статус замены'] == 'Нет замены')].sum(), 2)
-
-            max_dollar_price = round(report_stock_df['total $'].loc[(
-                    report_stock_df['Статус замены'] == 'Состав, МАХ цена') | (
-                    report_stock_df['Статус замены'] == 'Нет замены')].sum(), 2)
-            #-----
-            report_stock_df['% Доля\nстоимости компонента\nв стоимости известного состава'] = np.nan
-            report_stock_df[
-                '% Доля\nстоимости компонента\nв стоимости известного состава'
-            ].loc[
-                (report_stock_df['total $'] > 0)
-            ] = round((100 * report_stock_df['total $'].loc[report_stock_df['total $'] > 0] / dollar_price), 2)
-
-            report_stock_df['total EURO'] = report_stock_df['quantity'] * report_stock_df['Цена, EURO']
-
-            euro_price = round(report_stock_df['total EURO'].loc[(
-                    report_stock_df['Статус замены'] == 'Состав по док.') | (
-                    report_stock_df['Статус замены'] == 'Нет замены')].sum(), 2)
-
-            info_text += f'Цена (состав по док. по комп. с известной ценой) = {dollar_price} $ + {euro_price} euro\n'
-            info_text += f'MAX Цена = {max_dollar_price} $ \n'
-
-            null_df = report_stock_df[(report_stock_df['Цена, $'] == 0) & (report_stock_df['Цена, EURO'] == 0)]
-            null_price_list = list(null_df['Артикул'])
-            if null_price_list:
-                info_text += f'НЕТ ЦЕНЫ для этих компонентов (артикулы): {null_price_list} \n'
-
-            report_stock_df.loc[:, 'balance'] = report_stock_df['Склад основной'] - report_stock_df['quantity']
-            report_stock_df['balance'] = round(report_stock_df['balance'], 4)
-
-            report_stock_df['Артикул'] = report_stock_df['Артикул'].astype('int32')
-            report_stock_df['Артикул без замен'] = report_stock_df['Артикул без замен'].astype('int32')
-
-            if not euro_price:
-                report_stock_df = report_stock_df.drop(['Цена, EURO', 'total EURO'], axis=1)
+            report_stock_df, info_text = ReportMaker(self.stock_df).calculate_price(res_compo_df, info_text)
 
         self.report_info_label_text = info_text
 
@@ -1173,6 +1024,77 @@ class MyApp(QWidget):
 
         self.cache_reports_dict[self.report_7_name] = (report_stock_df, info_text)
 
+    def compose_report_8(self):
+        # read stock with comments
+        if self.stock_df is None:
+            self.prepare_stock_df()
+        self.cache_reports_dict[self.report_8_name] = (None, self.report_8_name)
+        print('FINISH compose_report_8')
+
+    def compose_report_9(self):
+        if self.stock_dev_df is None:
+            # read stock with comments
+            print('Чтение названий столбцов склада разработки...')
+            self.progress_bar.setValue(5)
+
+            sheet_name = 'Скл.Р(компоненты)'
+            column_names = DataReader(PATH_TO_FILE_STOCK, FILE_STOCK).get_column_names_by_openpyxl(sheet_name)
+            # print(column_names)
+            indexes = [i for i in range(0, len(column_names) - 1)]
+            cols_dict = {k: v for k, v in zip(indexes, column_names) if v}
+            # print(cols_dict)
+            # print(cols_dict.keys())
+
+            self.progress_bar.setValue(20)
+
+            stock_dev_df, msg, color = DataReader(
+                PATH_TO_FILE_STOCK, FILE_STOCK).read_data_from_stock_file(sheet_name, cols_dict.keys())
+            # print(stock_dev_df.head())
+            init_index = stock_dev_df.index
+            init_columns = stock_dev_df.columns
+            stock_dev_df = stock_dev_df.dropna(how='all')
+            # print(stock_dev_df.head())
+            # print(list(cols_dict.values())[6:])
+            ## list(cols_dict.values())[6:] ===> ['Цена, $', 'LDD......]
+            dev_body_cols = list(cols_dict.values())[6:]
+            stock_dev_df = stock_dev_df.dropna(how='all', subset=dev_body_cols)
+            # print(stock_dev_df.head())
+            # print(stock_dev_df[dev_body_cols].head())
+            self.progress_bar.setValue(30)
+
+            comments_df = DataReader(
+                PATH_TO_FILE_STOCK, FILE_STOCK).get_comments_df_by_openpyxl(
+                sheet_name,
+                stock_dev_df[dev_body_cols],
+                init_index,
+                init_columns
+            )
+            comments_df = comments_df.fillna('')
+            # print(comments_df[['LDD  Щербич ', 'RFPS Горбатов']].tail())
+
+            self.progress_bar.setValue(60)
+
+            # col_names_of_comments = dev_body_cols
+            for col_name in dev_body_cols:
+                stock_dev_df[f'comment_({col_name})'] = comments_df[col_name]
+                stock_dev_df = FuncLibrary().fill_comments_column_with_data(stock_dev_df, f'comment_({col_name})')
+                stock_dev_df[f'date_({col_name})'] = pd.to_datetime(
+                    stock_dev_df[f'comment_({col_name})'], format='%d.%m.%Y', errors='coerce'
+                )
+            dates_col_list = [f'date_({col_name})' for col_name in dev_body_cols]
+            stock_dev_df[f'date_max'] = stock_dev_df[dates_col_list].max(axis=1)
+
+            stock_dev_df[f'q-ty'] = stock_dev_df[dev_body_cols[1:]].sum(axis=1)
+
+            stock_dev_df = stock_dev_df.astype({'Артикул': int})
+
+            self.stock_dev_df = stock_dev_df
+
+        self.progress_bar.setValue(80)
+
+        self.cache_reports_dict[self.report_9_name] = (None, self.report_9_name)
+        print('FINISH compose_report_9')
+
     def get_report(self):
 
         if self.w is not None:
@@ -1184,8 +1106,8 @@ class MyApp(QWidget):
         self.report_info_label.setStyleSheet(f'color:{self.color};')
         self.report_info_label.setText('.....')
 
-        if self.modul_df is None:
-            self.read_modul_from_stock_file()
+        # if self.modul_df is None:
+        #     self.read_modul_from_stock_file()
 
         input_str = str(self.block_list_dict)
 
@@ -1205,49 +1127,212 @@ class MyApp(QWidget):
             self.checkBox_report_5: self.compose_report_5,
             self.checkBox_report_6: self.compose_report_6,
             self.checkBox_report_7: self.compose_report_7,
+            self.checkBox_report_8: self.compose_report_8,
+            self.checkBox_report_9: self.compose_report_9,
                           }
 
         report_name = self.report_name_dict.get(self.checkBox_group.checkedButton())
 
-        if self.checkBox_group.checkedButton() and self.block_list_dict and self.modul_df is not None:
+        # if self.checkBox_group.checkedButton() and self.block_list_dict and self.modul_df is not None:
+        if self.checkBox_group.checkedButton() is not None:
+            if self.block_list_dict is not None:
 
-            if not (self.old_dict_for_report.keys() and self.old_dict_for_report[input_str][report_name]):
-                self.color = 'blue'
-                self.report_info_label.setStyleSheet(f'color:{self.color};')
-                self.report_info_label.setText('..........')
+                if not (self.old_dict_for_report.keys() and self.old_dict_for_report[input_str][report_name]):
+                    # if self.modul_df is None:
+                    #     self.read_modul_from_stock_file()
 
-                self.func_dict[self.checkBox_group.checkedButton()]()
+                    self.color = 'blue'
+                    self.report_info_label.setStyleSheet(f'color:{self.color};')
+                    self.report_info_label.setText('..........')
 
-                try:
-                    self.old_dict_for_report[input_str] = self.cache_reports_dict
-                except Exception as e:
-                    print(e)
+                    self.func_dict[self.checkBox_group.checkedButton()]()
+                    print(f'input_str: {input_str}')
 
-            if self.color == 'red':
-                self.msg += f'\nОбработан отчёт: {report_name}.'
+                    try:
+                        self.old_dict_for_report[input_str] = self.cache_reports_dict
+                    except Exception as e:
+                        print(e)
+
+                    print('after try')
+
+                if self.color == 'red':
+                    self.msg += f'\nОбработан отчёт: {report_name}.'
+
+                else:
+
+                    self.msg = f'Обработан отчёт: {report_name}.'
+                    self.color = 'green'
+                res_df, info_text = self.old_dict_for_report[input_str][report_name]
+                print('get res_df')
+                if res_df is None:
+                #     print(f'__ input_str: {input_str}')
+                #     res_df, self.msg = self.old_dict_for_report[input_str][report_name]
+                # else:
+                    if info_text == self.report_8_name:
+                        res_df = self.stock_df
+                        print('report_8')
+
+                    if info_text == self.report_9_name:
+                        res_df = self.stock_dev_df
+                        print('report_9')
+                    self.msg = 'OK'
+                print('+res_df')
             else:
-
-                self.msg = f'Обработан отчёт: {report_name}.'
-                self.color = 'green'
-            res_df, info_text = self.old_dict_for_report[input_str][report_name]
+                self.msg = 'Блоки не заданы'
+                self.color = 'red'
+                res_df = None
+                # print(f'report_name: {report_name}')
+                # if report_name == 'Report_8 Склад основной с датами последних поступлений':
+                #     if self.stock_df is None:
+                #         self.prepare_stock_df()
+                #     res_df = self.stock_df
+                # elif report_name == 'Report_8 Склад основной с датами последних поступлений':
+                #     res_df = self.stock_dev_df
+                # else:
+                #     res_df = None
 
         else:
-            self.msg = 'Блоки не заданы' if report_name else 'Отчет не выбран'
+            # self.msg += '\nБлоки не заданы' if report_name else 'Отчет не выбран'
+            self.msg += 'Отчет не выбран'
             self.color = 'red'
-            info_text = self.msg
+            # info_text = self.msg
             res_df = None
+
+        # info_text = self.msg
 
         self.progress_bar.setValue(100)
         self._set_info_label()
 
         self.color = 'blue'
         self.report_info_label.setStyleSheet(f'color:{self.color};')
-        self.report_info_label.setText(info_text)
+        self.report_info_label.setText(self.msg)
 
         # REPORT WINDOW
         if res_df is not None and not res_df.empty and report_name:
             self.w = ReportWindow(report_name, res_df)
             self.w.show()
+
+    def get_stock(self):
+        print('GET STOCK')
+        report_name = 'Склад'
+
+        # close self.w if opened
+        if self.w is not None:
+            self.w.close()
+            self.w = None  # Discard reference to ReportWindow
+
+        # read stock with comments
+        # if self.stock_df is None:
+        #     self.prepare_stock_df()
+
+        # read stock_dev with comments
+        # print('Чтение названий столбцов склада разработки...')
+        #
+        # sheet_name = 'Скл.Р(компоненты)'
+        # column_names = DataReader(PATH_TO_FILE_STOCK, FILE_STOCK).get_column_names_by_openpyxl(sheet_name)
+        # print(column_names)
+        # indexes = [i for i in range(0, len(column_names)-1)]
+        # cols_dict = {k: v for k, v in zip(indexes, column_names) if v}
+        # print(cols_dict)
+        # print(cols_dict.keys())
+        #
+        # stock_dev_df, msg, color = DataReader(
+        #     PATH_TO_FILE_STOCK, FILE_STOCK).read_data_from_stock_file(sheet_name, cols_dict.keys())
+        # print(stock_dev_df.head())
+        # init_index = stock_dev_df.index
+        # init_columns = stock_dev_df.columns
+        # stock_dev_df = stock_dev_df.dropna(how='all')
+        # print(stock_dev_df.head())
+        # print(list(cols_dict.values())[6:])
+        # # list(cols_dict.values())[6:] ===> ['Цена, $', 'LDD......]
+        # dev_body_cols = list(cols_dict.values())[6:]
+        # stock_dev_df = stock_dev_df.dropna(how='all', subset=dev_body_cols)
+        # print(stock_dev_df.head())
+        # print(stock_dev_df[dev_body_cols].head())
+        # # print(stock_dev_df.loc[stock_dev_df[dev_body_cols]].head())
+        #
+        # comments_df = DataReader(
+        #     PATH_TO_FILE_STOCK, FILE_STOCK).get_comments_df_by_openpyxl(
+        #     sheet_name,
+        #     stock_dev_df[dev_body_cols],
+        #     init_index,
+        #     init_columns
+        # )
+        # comments_df = comments_df.fillna('')
+        # print(comments_df[['LDD  Щербич ', 'RFPS Горбатов']].tail())
+        #
+        # # col_names_of_comments = dev_body_cols
+        # for col_name in dev_body_cols:
+        #     stock_dev_df[f'comment_({col_name})'] = comments_df[col_name]
+        #     stock_dev_df = FuncLibrary().fill_comments_column_with_data(stock_dev_df, f'comment_({col_name})')
+        #     stock_dev_df[f'date_({col_name})'] = pd.to_datetime(
+        #         stock_dev_df[f'comment_({col_name})'], format='%d.%m.%Y', errors='coerce'
+        #     )
+
+        # res_df = stock_dev_df
+
+        # stock_dev_df = DataReader.read_data_from_stock_file(sheet_name, cols)
+
+        # res_df = self.stock_df
+
+
+
+
+        # get from stock_dev cols with max date and corresponding price, total q-ty
+        # join stock and stock_dev
+        self.compose_report_8()
+        self.compose_report_9()
+
+
+        # max_dt_group_df = self.stock_df[['Артикул осн.', 'date']].groupby('Артикул осн.').agg({'date': ['max']})
+        # max_dt_group_df.columns = max_dt_group_df.columns.map('_'.join)
+        # max_dt_group_df = max_dt_group_df.rename_axis(None, axis=1)
+        # print(max_dt_group_df.head(15))
+        # max_dt_group_df.rename(columns={'date_max': 'date_z', }, inplace=True)
+        # print(max_dt_group_df.head(15))
+        # self.stock_df = self.stock_df.merge(max_dt_group_df, how='left', on='Артикул осн.')
+
+        print(self.stock_df.columns)
+
+        big_stock_df = self.stock_df.merge(self.stock_dev_df[['Артикул', 'date_max', 'q-ty']], how='left', on='Артикул')
+
+        # big_stock_df[f'date_max_total'] = big_stock_df[['date', 'date_z', 'date_max']].max(axis=1)
+        big_stock_df[f'date_max_total'] = big_stock_df[['date', 'date_max']].max(axis=1)
+
+        big_stock_df[f'q-ty_total'] = big_stock_df[['Склад основной', 'q-ty']].sum(axis=1)
+
+        max_dt_group_df = big_stock_df[
+            ['Артикул осн.', 'date_max_total']
+        ].groupby('Артикул осн.').agg({'date_max_total': ['max']})
+        max_dt_group_df.columns = max_dt_group_df.columns.map('_'.join)
+        max_dt_group_df = max_dt_group_df.rename_axis(None, axis=1)
+        max_dt_group_df.rename(columns={'date_max_total_max': 'date_max_total_zam', }, inplace=True)
+
+        big_stock_df = big_stock_df.merge(max_dt_group_df, how='left', on='Артикул осн.')
+
+        big_stock_df['date_max_total_zam'] = big_stock_df[['date_max_total', 'date_max_total_zam']].max(axis=1)
+
+
+        res_df = big_stock_df
+
+        self.progress_bar.setValue(100)
+
+        # get cols with max date and corresponding price, total q-ty
+        # provide filtering in date columns - dates in the interval
+
+        # show self.w
+
+        # REPORT WINDOW
+        if res_df is not None and not res_df.empty and report_name:
+            self.w = ReportWindow(report_name, res_df)
+            self.w.show()
+        info_text = 'СКЛАД готов'
+        self.report_info_label.setText(info_text)
+        pass
+
+    def get_stock_mod(selfself):
+        print('GET STOCK MOD')
+        pass
 
     def exit_app(self):
         sys.exit()

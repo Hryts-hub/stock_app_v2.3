@@ -65,7 +65,7 @@ class PandasModel(QAbstractTableModel):
 
         self.layoutAboutToBeChanged.emit()
 
-        if self._dataframe.dtypes[column] in ('int32', 'float64'):
+        if self._dataframe.dtypes[column] in ('int32', 'int64', 'float64'):
             self._dataframe.sort_values(
                 by=self._dataframe.columns[column],
                 ascending=order == Qt.AscendingOrder,

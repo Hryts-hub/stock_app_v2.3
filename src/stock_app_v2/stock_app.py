@@ -95,12 +95,15 @@ class MyApp(QWidget):
         self.textbox3.setMaximum(1000)
 
         self.addButton = QPushButton("Добавить в список")
+        self.addButton.setStyleSheet('background: rgb(0,255,200);')  # green-mint
         self.to_file_addButton = QPushButton("Добавить в файл (не добавляйте мусорные, непроверенные данные!!!)")
+        self.to_file_addButton.setStyleSheet('background: rgb(200,255,200);')  # green-light
 
         self.label_list = QLabel("Выбранные блоки:")
         self.comboBox_list = QComboBox()
 
         self.removeButton = QPushButton("Убрать из списка")
+        self.removeButton.setStyleSheet('background: rgb(255,155,0);')  # orange
 
         # BOM - Bill Of Materials
 
@@ -173,6 +176,7 @@ class MyApp(QWidget):
         self.report_info_label_text = ''
 
         self.exitButton = QPushButton("Выйти")
+        self.exitButton.setStyleSheet('background: rgb(255,200,200);')  # red-light
 
         # self.block_list_dict structure --> {k=modul_name: v=[dict_of_moduls, dict_of_components, q-ty of moduls, idx]
         # dict were key is a module name, and value is a list of input data
@@ -250,7 +254,6 @@ class MyApp(QWidget):
         # GET_REPORT BUTTON --> opens ReportWindow with report table (can be saved in excel file)
         # and shows report text in self.report_info_label
         self.reportButton.clicked.connect(self.get_report)
-        #
         self.stockButton.clicked.connect(self.get_stock)
         self.stock_modButton.clicked.connect(self.get_stock_mod)
 
@@ -283,19 +286,10 @@ class MyApp(QWidget):
         hbox_list.addWidget(self.label_list)
         hbox_list.addWidget(self.comboBox_list)
 
-        #
         hbox_buttons = QHBoxLayout()
         hbox_buttons.addWidget(self.reportButton)
         hbox_buttons.addWidget(self.stockButton)
         hbox_buttons.addWidget(self.stock_modButton)
-
-        # hbox_report_0_8 = QHBoxLayout()
-        # hbox_report_0_8.addWidget(self.checkBox_report_0)
-        # hbox_report_0_8.addWidget(self.checkBox_report_8)
-        #
-        # hbox_report_1_9 = QHBoxLayout()
-        # hbox_report_1_9.addWidget(self.checkBox_report_1)
-        # hbox_report_1_9.addWidget(self.checkBox_report_9)
 
         vbox = QVBoxLayout()
         vbox.addWidget(self.info_label)  # widget with selected data_name
@@ -309,28 +303,20 @@ class MyApp(QWidget):
         vbox.addLayout(hbox_list)  # widget with list selected data_names (blocks)
         vbox.addWidget(self.removeButton)
 
-        # # vbox.addWidget(self.checkBox_report_0)
-        # vbox.addLayout(hbox_report_0_8)
-        # # vbox.addWidget(self.checkBox_report_1)
-        # vbox.addLayout(hbox_report_1_9)
-        # vbox.addWidget(self.checkBox_report_2)
-        # vbox.addWidget(self.checkBox_report_3)
-        # vbox.addWidget(self.checkBox_report_4)
-        # vbox.addWidget(self.checkBox_report_5)
-        # vbox.addWidget(self.checkBox_report_6)
-        # vbox.addWidget(self.checkBox_report_7)
-
         v1_box = QVBoxLayout()
         v1_box.addWidget(self.checkBox_report_0)
         v1_box.addWidget(self.checkBox_report_1)
         v1_box.addWidget(self.checkBox_report_2)
         v1_box.addWidget(self.checkBox_report_3)
         v1_box.addWidget(self.checkBox_report_4)
-        v1_box.addWidget(self.checkBox_report_5)
-        v1_box.addWidget(self.checkBox_report_6)
-        v1_box.addWidget(self.checkBox_report_7)
+        # v1_box.addWidget(self.checkBox_report_5)
+        # v1_box.addWidget(self.checkBox_report_6)
+        # v1_box.addWidget(self.checkBox_report_7)
 
         v2_box = QVBoxLayout()
+        v2_box.addWidget(self.checkBox_report_5)
+        v2_box.addWidget(self.checkBox_report_6)
+        v2_box.addWidget(self.checkBox_report_7)
         v2_box.addWidget(self.checkBox_report_8)
         v2_box.addWidget(self.checkBox_report_9)
 
@@ -340,7 +326,6 @@ class MyApp(QWidget):
 
         vbox.addLayout(hbox_reports)
 
-        # vbox.addWidget(self.reportButton)
         vbox.addLayout(hbox_buttons)
 
         vbox.addWidget(self.progress_bar)
@@ -1110,6 +1095,7 @@ class MyApp(QWidget):
         #     self.read_modul_from_stock_file()
 
         input_str = str(self.block_list_dict)
+        print(f'input_str: {input_str}')
 
         if input_str not in str(self.old_dict_for_report.keys()):
             self.report_info_label_text = f'{list(self.block_list_dict.keys())}'
@@ -1132,10 +1118,13 @@ class MyApp(QWidget):
                           }
 
         report_name = self.report_name_dict.get(self.checkBox_group.checkedButton())
+        info_text = ''
 
         # if self.checkBox_group.checkedButton() and self.block_list_dict and self.modul_df is not None:
         if self.checkBox_group.checkedButton() is not None:
-            if self.block_list_dict is not None:
+            print(self.block_list_dict)
+            # if self.block_list_dict is not None:
+            if self.block_list_dict:
 
                 if not (self.old_dict_for_report.keys() and self.old_dict_for_report[input_str][report_name]):
                     # if self.modul_df is None:
@@ -1177,6 +1166,7 @@ class MyApp(QWidget):
                         print('report_9')
                     self.msg = 'OK'
                 print('+res_df')
+                # self.msg = info_text
             else:
                 self.msg = 'Блоки не заданы'
                 self.color = 'red'
@@ -1193,19 +1183,18 @@ class MyApp(QWidget):
 
         else:
             # self.msg += '\nБлоки не заданы' if report_name else 'Отчет не выбран'
-            self.msg += 'Отчет не выбран'
+            self.msg = 'Отчет не выбран'
             self.color = 'red'
             # info_text = self.msg
             res_df = None
 
-        # info_text = self.msg
 
         self.progress_bar.setValue(100)
         self._set_info_label()
 
         self.color = 'blue'
         self.report_info_label.setStyleSheet(f'color:{self.color};')
-        self.report_info_label.setText(self.msg)
+        self.report_info_label.setText(info_text)
 
         # REPORT WINDOW
         if res_df is not None and not res_df.empty and report_name:
@@ -1221,82 +1210,13 @@ class MyApp(QWidget):
             self.w.close()
             self.w = None  # Discard reference to ReportWindow
 
-        # read stock with comments
-        # if self.stock_df is None:
-        #     self.prepare_stock_df()
-
-        # read stock_dev with comments
-        # print('Чтение названий столбцов склада разработки...')
-        #
-        # sheet_name = 'Скл.Р(компоненты)'
-        # column_names = DataReader(PATH_TO_FILE_STOCK, FILE_STOCK).get_column_names_by_openpyxl(sheet_name)
-        # print(column_names)
-        # indexes = [i for i in range(0, len(column_names)-1)]
-        # cols_dict = {k: v for k, v in zip(indexes, column_names) if v}
-        # print(cols_dict)
-        # print(cols_dict.keys())
-        #
-        # stock_dev_df, msg, color = DataReader(
-        #     PATH_TO_FILE_STOCK, FILE_STOCK).read_data_from_stock_file(sheet_name, cols_dict.keys())
-        # print(stock_dev_df.head())
-        # init_index = stock_dev_df.index
-        # init_columns = stock_dev_df.columns
-        # stock_dev_df = stock_dev_df.dropna(how='all')
-        # print(stock_dev_df.head())
-        # print(list(cols_dict.values())[6:])
-        # # list(cols_dict.values())[6:] ===> ['Цена, $', 'LDD......]
-        # dev_body_cols = list(cols_dict.values())[6:]
-        # stock_dev_df = stock_dev_df.dropna(how='all', subset=dev_body_cols)
-        # print(stock_dev_df.head())
-        # print(stock_dev_df[dev_body_cols].head())
-        # # print(stock_dev_df.loc[stock_dev_df[dev_body_cols]].head())
-        #
-        # comments_df = DataReader(
-        #     PATH_TO_FILE_STOCK, FILE_STOCK).get_comments_df_by_openpyxl(
-        #     sheet_name,
-        #     stock_dev_df[dev_body_cols],
-        #     init_index,
-        #     init_columns
-        # )
-        # comments_df = comments_df.fillna('')
-        # print(comments_df[['LDD  Щербич ', 'RFPS Горбатов']].tail())
-        #
-        # # col_names_of_comments = dev_body_cols
-        # for col_name in dev_body_cols:
-        #     stock_dev_df[f'comment_({col_name})'] = comments_df[col_name]
-        #     stock_dev_df = FuncLibrary().fill_comments_column_with_data(stock_dev_df, f'comment_({col_name})')
-        #     stock_dev_df[f'date_({col_name})'] = pd.to_datetime(
-        #         stock_dev_df[f'comment_({col_name})'], format='%d.%m.%Y', errors='coerce'
-        #     )
-
-        # res_df = stock_dev_df
-
-        # stock_dev_df = DataReader.read_data_from_stock_file(sheet_name, cols)
-
-        # res_df = self.stock_df
-
-
-
-
-        # get from stock_dev cols with max date and corresponding price, total q-ty
-        # join stock and stock_dev
         self.compose_report_8()
         self.compose_report_9()
-
-
-        # max_dt_group_df = self.stock_df[['Артикул осн.', 'date']].groupby('Артикул осн.').agg({'date': ['max']})
-        # max_dt_group_df.columns = max_dt_group_df.columns.map('_'.join)
-        # max_dt_group_df = max_dt_group_df.rename_axis(None, axis=1)
-        # print(max_dt_group_df.head(15))
-        # max_dt_group_df.rename(columns={'date_max': 'date_z', }, inplace=True)
-        # print(max_dt_group_df.head(15))
-        # self.stock_df = self.stock_df.merge(max_dt_group_df, how='left', on='Артикул осн.')
 
         print(self.stock_df.columns)
 
         big_stock_df = self.stock_df.merge(self.stock_dev_df[['Артикул', 'date_max', 'q-ty']], how='left', on='Артикул')
 
-        # big_stock_df[f'date_max_total'] = big_stock_df[['date', 'date_z', 'date_max']].max(axis=1)
         big_stock_df[f'date_max_total'] = big_stock_df[['date', 'date_max']].max(axis=1)
 
         big_stock_df[f'q-ty_total'] = big_stock_df[['Склад основной', 'q-ty']].sum(axis=1)
@@ -1309,18 +1229,11 @@ class MyApp(QWidget):
         max_dt_group_df.rename(columns={'date_max_total_max': 'date_max_total_zam', }, inplace=True)
 
         big_stock_df = big_stock_df.merge(max_dt_group_df, how='left', on='Артикул осн.')
-
         big_stock_df['date_max_total_zam'] = big_stock_df[['date_max_total', 'date_max_total_zam']].max(axis=1)
-
 
         res_df = big_stock_df
 
         self.progress_bar.setValue(100)
-
-        # get cols with max date and corresponding price, total q-ty
-        # provide filtering in date columns - dates in the interval
-
-        # show self.w
 
         # REPORT WINDOW
         if res_df is not None and not res_df.empty and report_name:

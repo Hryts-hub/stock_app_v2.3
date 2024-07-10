@@ -9,6 +9,8 @@ import pandas as pd
 # to disable warnings
 # pd.options.mode.chained_assignment = None  # default='warn'
 
+import ast
+
 from PyQt5.QtWidgets import QWidget, QLabel, QComboBox, QPushButton, QVBoxLayout, QHBoxLayout, QSizePolicy
 from PyQt5.QtWidgets import QLineEdit, QTextEdit, QSpinBox, QCheckBox, QButtonGroup, QProgressBar
 
@@ -573,6 +575,7 @@ class MyApp(QWidget):
             if v[3] == combo_idx:
                 self.block_list_dict.pop(k)
                 self.msg = f'{k} удален из списка.'
+                print(f'self.block_list_dict: {self.block_list_dict}')
                 break
         self._refresh_comboBox_list()
         self.color = 'green'
@@ -1091,11 +1094,7 @@ class MyApp(QWidget):
         self.report_info_label.setStyleSheet(f'color:{self.color};')
         self.report_info_label.setText('.....')
 
-        # if self.modul_df is None:
-        #     self.read_modul_from_stock_file()
-
         input_str = str(self.block_list_dict)
-        print(f'input_str: {input_str}')
 
         if input_str not in str(self.old_dict_for_report.keys()):
             self.report_info_label_text = f'{list(self.block_list_dict.keys())}'
@@ -1120,74 +1119,61 @@ class MyApp(QWidget):
         report_name = self.report_name_dict.get(self.checkBox_group.checkedButton())
         info_text = ''
 
-        # if self.checkBox_group.checkedButton() and self.block_list_dict and self.modul_df is not None:
         if self.checkBox_group.checkedButton() is not None:
-            print(self.block_list_dict)
-            # if self.block_list_dict is not None:
-            if self.block_list_dict:
-
-                if not (self.old_dict_for_report.keys() and self.old_dict_for_report[input_str][report_name]):
-                    # if self.modul_df is None:
-                    #     self.read_modul_from_stock_file()
+            if self.block_list_dict is not None:
+                if input_str != '{}' and not (self.old_dict_for_report.keys() and self.old_dict_for_report[input_str][report_name]):
 
                     self.color = 'blue'
                     self.report_info_label.setStyleSheet(f'color:{self.color};')
                     self.report_info_label.setText('..........')
 
                     self.func_dict[self.checkBox_group.checkedButton()]()
-                    print(f'input_str: {input_str}')
 
                     try:
                         self.old_dict_for_report[input_str] = self.cache_reports_dict
                     except Exception as e:
                         print(e)
 
-                    print('after try')
-
                 if self.color == 'red':
                     self.msg += f'\nОбработан отчёт: {report_name}.'
-
                 else:
-
                     self.msg = f'Обработан отчёт: {report_name}.'
                     self.color = 'green'
-                res_df, info_text = self.old_dict_for_report[input_str][report_name]
-                print('get res_df')
+
+                if input_str != '{}':
+                    res_df, info_text = self.old_dict_for_report[input_str][report_name]
+                else:
+                    res_df = None
+                    info_text = 'Блоки не заданы! ДОБАВЬТЕ В СПИСОК БЛОК!'
+                    self.color = 'red'
+
                 if res_df is None:
-                #     print(f'__ input_str: {input_str}')
-                #     res_df, self.msg = self.old_dict_for_report[input_str][report_name]
-                # else:
                     if info_text == self.report_8_name:
                         res_df = self.stock_df
-                        print('report_8')
 
                     if info_text == self.report_9_name:
                         res_df = self.stock_dev_df
-                        print('report_9')
-                    self.msg = 'OK'
-                print('+res_df')
-                # self.msg = info_text
+
+                    self.msg = info_text
+
+                elif not res_df.shape[0]:
+
+                    if input_str == '{}':
+                        self.msg = 'Блоки не заданы! ДОБАВЬТЕ В СПИСОК БЛОК!'
+                        self.color = 'red'
+                    else:
+                        info_text = 'НЕТ ДАННЫХ ДЛЯ ОТЧЕТА'
+                    res_df = None
+
             else:
-                self.msg = 'Блоки не заданы'
+                self.msg = 'ОШИБКА. Блоки не заданы.'
                 self.color = 'red'
                 res_df = None
-                # print(f'report_name: {report_name}')
-                # if report_name == 'Report_8 Склад основной с датами последних поступлений':
-                #     if self.stock_df is None:
-                #         self.prepare_stock_df()
-                #     res_df = self.stock_df
-                # elif report_name == 'Report_8 Склад основной с датами последних поступлений':
-                #     res_df = self.stock_dev_df
-                # else:
-                #     res_df = None
 
         else:
-            # self.msg += '\nБлоки не заданы' if report_name else 'Отчет не выбран'
             self.msg = 'Отчет не выбран'
             self.color = 'red'
-            # info_text = self.msg
             res_df = None
-
 
         self.progress_bar.setValue(100)
         self._set_info_label()

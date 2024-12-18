@@ -18,6 +18,53 @@ class DictMaker:
                     {k: v + res_dict.get(k)})
         return res_dict
 
+    @staticmethod
+    def make_dicts_of_modul_compo_err(prepared_list):
+        modul_dict = {}
+        component_dict = {}
+        error_dict = {}
+
+        if prepared_list:
+            for t in prepared_list:
+                k = t[0].strip()
+                v = t[1].strip() if len(t) == 2 else ''
+                if (
+                        k.endswith('c')
+                        and k[:-1].strip().isdigit()
+                        and v.replace('.', '').isdigit()
+                ):
+
+                    k = int(k[:-1].strip())
+                    v = float(v)
+                    if k not in modul_dict:
+                        modul_dict.update({k: v})
+                    else:
+                        modul_dict.update({k: v + modul_dict.get(k)})
+                elif (
+                        k.startswith('c')
+                        and k[1:].strip().isdigit()
+                        and v.replace('.', '').isdigit()
+                ):
+
+                    k = int(k[1:].strip())
+                    v = float(v)
+                    if k not in modul_dict:
+                        modul_dict.update({k: v})
+                    else:
+                        modul_dict.update({k: v + modul_dict.get(k)})
+                elif k.isdigit() and v.replace('.', '').isdigit():
+
+                    k = int(k)
+                    v = float(v)
+                    if k not in component_dict:
+                        component_dict.update({k: v})
+                    else:
+                        component_dict.update({k: v + component_dict.get(k)})
+                else:
+                    error_dict[k] = v
+
+        return modul_dict, component_dict, error_dict
+
     def make_report_dict(self):
         all_block = [
             self._modules_in_block(v[0], v[2]) for v in self.combobox_dict.values()]  # list of moduls dicts and q-ties
@@ -47,17 +94,23 @@ class DictMaker:
         return modul_dict
 
     @staticmethod
-    def remove_zero_values(input_str):
-        error_dict = {}
-        input_dict = eval(input_str)
+    def remove_zero_values(input_dict):
+        """
+        Removes entries from a dictionary where the key is 0 or the value is 0.0 and returns the modified dictionary
+        along with a dictionary of removed entries.
 
-        for k, v in input_dict.items():
-            if float(v) == 0.0:
-                error_dict[k] = v
+        Parameters:
+        input_dict (dict): A dictionary where keys are integers and values are floats.
 
-        for k in error_dict.keys():
-            input_dict.pop(k)
+        Returns:
+        tuple: A tuple containing two dictionaries:
+            - output_dict: The input dictionary with entries removed where the key is 0 or the value is 0.0.
+            - error_dict: A dictionary containing the entries removed from input_dict.
+        """
+        # Create a dictionary of entries to remove where the key is 0 or the value is 0.0
+        error_dict = {k: v for k, v in input_dict.items() if k == 0 or v == 0.0}
 
-        output_dict = input_dict
+        # Create the output dictionary by excluding keys from error_dict
+        output_dict = {k: v for k, v in input_dict.items() if k not in error_dict}
 
         return output_dict, error_dict

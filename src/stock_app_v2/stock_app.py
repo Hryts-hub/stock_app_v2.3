@@ -34,7 +34,7 @@ PATH_TO_FILE_STOCK = 'Z:/Склад/'
 # dev
 # FILE_OF_PRODUCTS = 'data_3_col.csv'
 # PATH_TO_FILE_OF_PRODUCTS = 'D:/OEMTECH/Projects/FILE_STOCK_FOLDER/'
-# PATH_TO_FILE_STOCK = 'D:/OEMTECH/Projects/FILE_STOCK_FOLDER/stock_versions/stock_5044/'
+# PATH_TO_FILE_STOCK = 'D:/OEMTECH/Projects/FILE_STOCK_FOLDER/stock_versions/stock_5231/'
 
 # columns in this file = columns in data frame
 COLUMN_PRODUCT_NAMES = 'наименование блока'
@@ -477,7 +477,8 @@ class MyApp(QWidget):
         dict_validator_flag, self.msg, block_name, moduls_dict_str, components_dict_str = Validator(
             self.textbox1.displayText(),
             self.textbox2.toPlainText(),
-            self.textbox22.toPlainText()).validate()
+            self.textbox22.toPlainText()
+        ).validate()
 
         if dict_validator_flag:
             self.textbox1.setText(block_name)
@@ -869,7 +870,8 @@ class MyApp(QWidget):
         """
         print('prepare_stock_df')
         self.progress_bar.setValue(20)
-        cols = 'C, D, E, G, I, K, L, M, N, O, Q'  # added E, L, M, N, O +Q
+        # cols = 'C, D, E, G, I, K, L, M, N, O, Q'  # added E, L, M, N, O +Q
+        cols = 'C:S'
         sheet_name = 'Склад'
         self.stock_df, self.msg, self.color = DataReader(
             PATH_TO_FILE_STOCK, FILE_STOCK).read_data_from_stock_file(sheet_name, cols)

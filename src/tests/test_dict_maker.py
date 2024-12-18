@@ -41,13 +41,38 @@ def test_make_dict_from_df(modul_df, col_name1, col_name2, expected_result):
     assert res == expected_result
 
 
-@pytest.mark.parametrize('test_str, expected_result',
-                         [
-                             ('{111: 0, 222: 2}', ({222: 2}, {111: 0})),
-                             ('{111: 1, 222: 0}', ({111: 1}, {222: 0}))
-                         ]
-                         )
-def test_remove_zero_values(test_str, expected_result):
-    res = DictMaker().remove_zero_values(test_str)
-    assert res == expected_result
+# @pytest.mark.parametrize('test_dict, expected_result',
+#                          [
+#                              ({111: 0, 222: 2}, ({222: 2.0}, {111: 0.0})),
+#                              ({111: 1, 222: 0}, ({111: 1.0}, {222: 0.0})),
+#                              ({0: 1, 222: 2}, ({222: 2.0}, {0: 1.0})),
+#                              # ({0.0: 1, 222: 2}, ({222: 2.0}, {0.0: 1})),
+#                              # -- in {k:v} where k is float k added to error_dict as string containing point ( '.' )
+#                          ]
+#                          )
+# def test_remove_zero_values(test_dict, expected_result):
+#     res = DictMaker().remove_zero_values(test_dict)
+#     assert res == expected_result
+
+@pytest.mark.parametrize("input_dict, expected_output, expected_error", [
+    # 1
+    # A typical dictionary with both keys and values to remove.
+    ({0: 10, 1: 0.0, 2: 3.5}, {2: 3.5}, {0: 10, 1: 0.0}),
+    # 2
+    # An empty dictionary as input.
+    ({}, {}, {}),
+    # 3
+    # A dictionary without any keys or values to remove.
+    ({1: 1.0, 2: 2.0}, {1: 1.0, 2: 2.0}, {}),
+    # 4
+    # A dictionary with multiple 0 keys and values.
+    ({0: 0.0, 0: 0.0}, {}, {0: 0.0}),
+    # 5
+    # A mixed dictionary with several removable entries.
+    ({0: 0, 1: 0.0, 2: 0.0, 3: 3.0}, {3: 3.0}, {0: 0, 1: 0.0, 2: 0.0})
+])
+def test_remove_zero_values(input_dict, expected_output, expected_error):
+    output_dict, error_dict = DictMaker().remove_zero_values(input_dict)
+    assert output_dict == expected_output
+    assert error_dict == expected_error
 
